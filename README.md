@@ -23,6 +23,15 @@ This project is built with:
 
 The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see the architecture doc below.
 
+**Current implementation:** Stages 1 and 2 of the [phased plan](docs/phased-plan.md) are complete: minimal Express + PokeAPI proxy and hexagonal structure (domain ports, Pokémon use cases, CatalogController, PokeAPI adapter). Endpoints `GET /health`, `GET /catalog/list`, and `GET /catalog/list/:id` are available and tested. **Security:** Helmet (HTTP headers), CORS (configurable via `CORS_ORIGIN`). **Testing:** Jest + supertest (integration and unit tests). Bootstrap split into `index.js` (entry) and `app.js` (`createApp()` for testability).
+
+## 🛠️ Scripts
+
+- `npm run dev` — Start server with nodemon (hot reload)
+- `npm test` — Run tests (Jest)
+- `npm run test:watch` — Run tests in watch mode
+- `npm run test:coverage` — Run tests with coverage report
+
 ## 📚 Documentation
 
 - **[docs/business-rules.md](docs/business-rules.md)** — Canonical business rules: catalog, team selection, lobby states, battle flow, damage formula, events, and persistence. Used by both backend and frontend.
