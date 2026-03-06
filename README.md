@@ -2,7 +2,6 @@
 
 # 🎮 PokePVP — Backend ⚡
 
-[![Pokémon PvP Lite](https://img.shields.io/badge/Pok%C3%A9mon-Stadium%20Lite-DC0A2D?style=for-the-badge)](.)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com)
 [![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://mongodb.com)
@@ -12,7 +11,7 @@
 
 </div>
 
-Backend for **Pokémon Stadium Lite**: a lightweight PvP game where two players pick a team of 3 Pokémon from a catalog, join a lobby, and fight in real-time until one player wins.
+Backend for **PokePVP**: a lightweight PvP game where two players pick a team of 3 Pokémon from a catalog, join a lobby, and fight in real-time until one player wins.
 
 ## 🏗️ Architecture
 
