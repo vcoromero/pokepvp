@@ -2,9 +2,11 @@
 
 This plan is based on [architecture.md](architecture.md) and [business-rules.md](business-rules.md). The final backend will be hexagonal, with Express, MongoDB, and Socket.IO. Incremental stages are planned; the **first** is a simple Express structure with no architecture, only to consume the external Pokémon API.
 
+**Current progress:** Stage 1 and Stage 2 complete. Next: Stage 3 (MongoDB and persistence).
+
 ---
 
-## Stage 1 — Minimal Express + PokeAPI proxy (first deliverable)
+## Stage 1 — Minimal Express + PokeAPI proxy (first deliverable) ✅ DONE
 
 **Goal:** Minimal Express app running on port 8080, listening on `0.0.0.0`, exposing routes that query the external Pokémon API. No layers, no ports/adapters, no database or Socket.IO.
 
@@ -30,24 +32,26 @@ pokepvp/
 
 **Stage 1 deliverables:**
 
-- `package.json` with Express and an HTTP client (axios or node-fetch). Scripts: `start`, `dev` (nodemon optional).
-- Environment variables: `PORT=8080`, `POKEAPI_BASE_URL=https://pokemon-api-92034153384.us-central1.run.app` (no hardcoded values per architecture).
-- **GET /catalog/list** route: proxy to `GET {POKEAPI_BASE_URL}/list`, return JSON to the client.
-- **GET /catalog/list/:id** route: proxy to `GET {POKEAPI_BASE_URL}/list/:id`, return JSON.
-- **GET /health** (optional but useful): `200` to verify the server is up.
-- Basic error handling: if the external API fails or returns 4xx/5xx, respond with an appropriate status and message (e.g. 502 or 503).
+- [x] `package.json` with Express and an HTTP client (native fetch in Node 18+). Scripts: `start`, `dev` (nodemon).
+- [x] Environment variables: `PORT=8080`, `POKEAPI_BASE_URL=https://pokemon-api-92034153384.us-central1.run.app` (no hardcoded values per architecture).
+- [x] **GET /catalog/list** route: proxy to `GET {POKEAPI_BASE_URL}/list`, return JSON to the client.
+- [x] **GET /catalog/list/:id** route: proxy to `GET {POKEAPI_BASE_URL}/list/:id`, return JSON.
+- [x] **GET /health**: `200` to verify the server is up.
+- [x] Basic error handling: if the external API fails or returns 4xx/5xx, respond with an appropriate status and message (502, 503).
 
 **Success criteria:** `npm run dev` starts the server on 8080; `GET http://localhost:8080/catalog/list` and `GET http://localhost:8080/catalog/list/1` return the same data as the external API (or a controlled error if the API is unavailable).
 
 ---
 
-## Stage 2 — Introduce hexagonal structure (domain + catalog port)
+## Stage 2 — Introduce hexagonal structure (domain + catalog port) ✅ DONE
 
-- Create folders: `domain`, `application/ports`, `application/use-cases`, `adapters/input` (HTTP), `adapters/output` (HTTP client to PokeAPI).
-- Define the **catalog output port** (e.g. `CatalogRepository` or `PokemonCatalogClient`): interface with `getList()` and `getById(id)`.
-- Implement the **output adapter** that already exists in Stage 1 (HTTP calls to the external API) behind that port.
-- Express controllers (input adapters) call a **use case** "Get catalog list" / "Get catalog detail" that in turn uses the port; no business logic beyond "delegate to catalog".
-- The Express app still exposes the same routes (`/catalog/list`, `/catalog/list/:id`, `/health`); only the code is reorganized into layers.
+> **Detailed specification:** See [stage-2-spec.md](stage-2-spec.md) for folder structure, components, data flow, and implementation checklist.
+
+- [x] Create folders: `domain/ports`, `domain/entities`, `application/use-cases`, `infrastructure/http` (controllers), `infrastructure/clients` (PokeAPI client), `infrastructure/mappers`, `infrastructure/persistence`. Ports live in **domain** (domain defines the contracts; infrastructure implements them).
+- [x] Define the **catalog output port** (`domain/ports/catalog.port.js`): interface with `getList()` and `getById(id)`.
+- [x] Implement the **output adapter** (`infrastructure/clients/pokeapi.adapter.js`) behind that port; custom errors in `infrastructure/errors/`.
+- [x] **Naming (Option B):** API and port use **catalog** (routes `/catalog/list`, `CatalogPort`, `CatalogController`); use cases use **Pokémon** (`GetPokemonListUseCase`, `GetPokemonByIdUseCase`). Controllers call these use cases; use cases use the catalog port.
+- [x] The Express app exposes the same routes (`/catalog/list`, `/catalog/list/:id`, `/health`); code reorganized into hexagonal layers. Verified with Bruno.
 
 ---
 
@@ -133,13 +137,13 @@ flowchart LR
 
 ## Summary
 
-| Stage | Content |
-| ----- | ------- |
-| **1** | Minimal Express, routes `/catalog/list`, `/catalog/list/:id`, `/health`, proxy to PokeAPI, config via env. |
-| **2** | Hexagonal structure: domain, catalog port, HTTP adapter, catalog use cases. |
-| **3** | Repository ports and MongoDB implementations. |
-| **4** | Lobby and team assignment (use cases + REST or Socket.IO). |
-| **5** | Socket.IO, real-time port, lobby/battle events. |
-| **6** | Full battle: turns, damage, defeat, game end and events. |
+| Stage | Content | Status |
+| ----- | ------- | ------ |
+| **1** | Minimal Express, routes `/catalog/list`, `/catalog/list/:id`, `/health`, proxy to PokeAPI, config via env. | ✅ Done |
+| **2** | Hexagonal structure: domain, catalog port, HTTP adapter, Pokémon use cases (Option B naming). | ✅ Done |
+| **3** | Repository ports and MongoDB implementations. | Pending |
+| **4** | Lobby and team assignment (use cases + REST or Socket.IO). | Pending |
+| **5** | Socket.IO, real-time port, lobby/battle events. | Pending |
+| **6** | Full battle: turns, damage, defeat, game end and events. | Pending |
 
 **Stage 1** is deliberately flat (no domain/ports/adapters folders) to quickly validate Express and integration with the PokeAPI; from Stage 2 onward the architecture described in [architecture.md](architecture.md) is introduced.

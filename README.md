@@ -23,6 +23,8 @@ This project is built with:
 
 The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see the architecture doc below.
 
+**Current implementation:** Stages 1 and 2 of the [phased plan](docs/phased-plan.md) are complete: minimal Express + PokeAPI proxy and hexagonal structure (domain ports, Pokémon use cases, CatalogController, PokeAPI adapter). Endpoints `GET /health`, `GET /catalog/list`, and `GET /catalog/list/:id` are available and tested.
+
 ## 📚 Documentation
 
 - **[docs/business-rules.md](docs/business-rules.md)** — Canonical business rules: catalog, team selection, lobby states, battle flow, damage formula, events, and persistence. Used by both backend and frontend.

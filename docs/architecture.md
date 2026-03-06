@@ -20,7 +20,8 @@ The core of the application is the **domain**; all external concerns (HTTP, WebS
 
 ### 2.1 Domain (Core)
 
-- **Entities** and **business rules** live here with **no dependency** on Express, MongoDB, or any transport.
+- **Entities**, **value objects**, and **business rules** live here with **no dependency** on Express, MongoDB, or any transport.
+- **`domain/ports/`** — Output port interfaces (e.g. `CatalogPort`, `LobbyRepository`). The domain defines the contracts it needs; infrastructure implements them. This follows the inversion of dependency principle.
 - All battle, lobby, and team rules are implemented in the domain (or application layer that uses the domain). See [business-rules.md](business-rules.md) for the canonical rules.
 - The domain does **not** import frameworks or infrastructure.
 
@@ -33,18 +34,22 @@ The core of the application is the **domain**; all external concerns (HTTP, WebS
 ### 2.3 Output Ports
 
 - **Persistence:** Repository interfaces (e.g. `LobbyRepository`, `BattleRepository`, `PlayerRepository`) for saving/loading players, lobbies, teams, battles, and Pokémon state.
-- **External API:** Interface to fetch the Pokémon catalog (list and detail) from the external API.
+- **External API:** Interface to fetch the Pokémon catalog (list and detail) from the external API. Naming convention: **catalog** for the port and API routes; **Pokémon** for use cases (e.g. `GetPokemonListUseCase`).
 - **Real-time:** Interface to send events to connected clients (e.g. `lobby_status`, `battle_start`, `turn_result`, `battle_end`). The implementation uses **Socket.IO**.
 
-### 2.4 Input Adapters
+### 2.4 Input Adapters (Infrastructure Layer)
 
-- **Express REST controllers:** Handle HTTP requests (e.g. catalog proxy, health check) and translate them into calls to **input ports** (use cases).
+Input adapters live under `infrastructure/`:
+
+- **`infrastructure/http/`** — Express REST controllers: handle HTTP requests (e.g. catalog proxy, health check) and translate them into calls to **input ports** (use cases).
 - **Socket.IO handlers:** Handle real-time events (`join_lobby`, `assign_pokemon`, `ready`, `attack`) and delegate to the same input ports. The rest of the app only depends on the real-time **port**, not on Socket.IO directly.
 
-### 2.5 Output Adapters
+### 2.5 Output Adapters (Infrastructure Layer)
 
-- **MongoDB:** Implements repository interfaces; stores players, lobbies, team selections, battles, and Pokémon state (HP, defeated flag, etc.).
-- **HTTP client:** Implements the catalog port; calls the external Pokémon API.
+Output adapters also live under `infrastructure/`:
+
+- **`infrastructure/persistence/`** — MongoDB implementations: implement repository interfaces; store players, lobbies, team selections, battles, and Pokémon state (HP, defeated flag, etc.).
+- **`infrastructure/clients/`** — External API clients: implement the catalog port; call the external Pokémon API.
 - **Real-time adapter:** Implements the “notify clients” port using **Socket.IO** (e.g. emit `battle_start`, `turn_result`, `battle_end` to the right clients).
 
 ---
@@ -85,7 +90,7 @@ flowchart LR
     WebClient[Web or Mobile Client]
   end
 
-  subgraph inputAdapters [Input Adapters]
+  subgraph infrastructure [Infrastructure - Input]
     ExpressREST[Express REST]
     SocketIOHandler[Socket.IO Handler]
   end
@@ -107,7 +112,7 @@ flowchart LR
     RealtimePort[Real-time Port]
   end
 
-  subgraph outputAdapters [Output Adapters]
+  subgraph outputInfra [Infrastructure - Output]
     MongoDB[(MongoDB)]
     ExternalAPI[External Pokémon API]
     SocketIO[(Socket.IO)]
@@ -132,6 +137,8 @@ flowchart LR
   SocketIO --> WebClient
 ```
 
+*Domain: `ports/`, `entities/`. Infrastructure: `http/`, `clients/`, `persistence/`, `mappers/`, `auth/`*
+
 ---
 
 ## 6. Error Handling and Configuration
@@ -145,7 +152,7 @@ flowchart LR
 
 - **Database:** MongoDB.
 - **Entities to persist:** Player, Lobby, Team selection, Battle, Pokémon state (current HP, defeated flag), and battle/lobby status (`waiting`, `ready`, `battling`, `finished`). See [business-rules.md](business-rules.md) for the full list.
-- **Responsibility:** Repository **interfaces** are defined in the application/domain side; **MongoDB implementations** live in the infrastructure (output adapters). The exact schema and indexing are part of the adapter design.
+- **Responsibility:** Repository **interfaces** (ports) are defined in `domain/ports/`; **MongoDB implementations** live in `infrastructure/persistence/`. The exact schema and indexing are part of the adapter design.
 
 ---
 
