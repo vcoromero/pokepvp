@@ -141,10 +141,11 @@ flowchart LR
 
 ---
 
-## 6. Error Handling and Configuration
+## 6. Error Handling, Configuration, and Security
 
 - **Centralized exception handling:** Errors are caught at the **edge** (Express middleware, Socket.IO error handlers). The application and domain throw or return domain/application errors; adapters map them to HTTP status codes or client events.
-- **Configuration:** All environment-dependent values (port, MongoDB URL, external API base URL, etc.) shall come from **environment variables** (or a validated config object). Secrets and URLs must **not** be hardcoded.
+- **Configuration:** All environment-dependent values (port, MongoDB URL, external API base URL, CORS origin, etc.) shall come from **environment variables** (or a validated config object). Secrets and URLs must **not** be hardcoded.
+- **Security middleware:** **Helmet** sets secure HTTP headers (X-Content-Type-Options, X-Frame-Options, etc.). **CORS** restricts which origins can call the API from the browser; configurable via `CORS_ORIGIN` (default `http://localhost:3000` for local frontend development).
 
 ---
 

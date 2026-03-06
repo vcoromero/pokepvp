@@ -52,6 +52,7 @@ pokepvp/
 - [x] Implement the **output adapter** (`infrastructure/clients/pokeapi.adapter.js`) behind that port; custom errors in `infrastructure/errors/`.
 - [x] **Naming (Option B):** API and port use **catalog** (routes `/catalog/list`, `CatalogPort`, `CatalogController`); use cases use **Pokémon** (`GetPokemonListUseCase`, `GetPokemonByIdUseCase`). Controllers call these use cases; use cases use the catalog port.
 - [x] The Express app exposes the same routes (`/catalog/list`, `/catalog/list/:id`, `/health`); code reorganized into hexagonal layers. Verified with Bruno.
+- [x] Security: Helmet, CORS. Testing: Jest + supertest. Bootstrap split into `index.js` + `app.js` (`createApp()` for testability).
 
 ---
 

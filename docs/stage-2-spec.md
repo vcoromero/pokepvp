@@ -20,7 +20,8 @@ The project uses an **infrastructure** layer (instead of "adapters") to align wi
 
 ```
 src/
-  index.js                    # bootstrap: wire dependencies, start Express
+  index.js                    # entry: load env, createApp(), listen
+  app.js                      # createApp(options): wires helmet, cors, routes, error middleware; supports catalogPort override for tests
   domain/
     ports/
       catalog.port.js         # output port: interface for fetching catalog (domain defines the contract)
@@ -127,18 +128,25 @@ Use cases orchestrate the flow. They receive the catalog port (injected) and del
 
 ---
 
-### 3.5 Bootstrap — index.js
+### 3.5 Bootstrap — index.js and app.js
 
-**File:** `src/index.js`
+**Files:** `src/index.js`, `src/app.js`
 
-**Responsibilities:**
+Bootstrap is split for **testability**: `index.js` is the entry point; `app.js` exports `createApp(options)` so the app can be tested with supertest without starting the server.
+
+**index.js** — Entry point:
 - Load environment (dotenv)
-- Create the output adapter (PokeAPI adapter) with config from env
-- Create use cases, injecting the catalog port (the PokeAPI adapter)
+- Call `createApp()` from `app.js`
+- Start Express on `PORT` and `0.0.0.0`
+
+**app.js** — `createApp(options)`:
+- Create the output adapter (PokeAPI adapter) or use `options.catalogPort` for tests
+- Create use cases, injecting the catalog port
 - Create the catalog controller, injecting the use cases
+- Mount security middleware: **Helmet**, **CORS** (origin from `CORS_ORIGIN` env, default `http://localhost:3000`)
 - Mount routes: `/health`, `/catalog` (controller)
 - Global error middleware
-- Start Express on `PORT` and `0.0.0.0`
+- Return the Express app (no listen)
 
 **Dependency flow:**
 ```
@@ -190,12 +198,14 @@ sequenceDiagram
 | `services/pokeapi.js`      | `infrastructure/clients/pokeapi-adapter.js`  |
 | Routes call pokeapi directly | Routes call use cases; use cases call port |
 | No ports, no use cases     | Port + use cases + adapters                  |
-| `index.js`                 | `index.js` (rewired for DI)                  |
+| `index.js`                 | `index.js` (entry) + `app.js` (createApp, DI, testability) |
 
 **Unchanged:**
 - Routes: `/catalog/list`, `/catalog/list/:id`, `/health`
 - Response format and error handling behavior
-- Environment variables: `PORT`, `POKEAPI_BASE_URL`
+- Environment variables: `PORT`, `POKEAPI_BASE_URL`, `CORS_ORIGIN` (optional; default `http://localhost:3000`)
+
+**Added (security):** Helmet (HTTP security headers), CORS (allowed origins for frontend).
 
 ---
 
@@ -207,9 +217,11 @@ sequenceDiagram
 - [x] Implement `GetPokemonListUseCase` (get-pokemon-list.use-case.js)
 - [x] Implement `GetPokemonByIdUseCase` (get-pokemon-by-id.use-case.js)
 - [x] Implement CatalogController (input adapter) — `infrastructure/http/catalog.controller.js`
-- [x] Update `index.js` to wire dependencies and mount controller (ESM, dotenv, error middleware)
+- [x] Update `index.js` and `app.js` — bootstrap split: `createApp(options)` in app.js for testability (Jest + supertest)
+- [x] Security: Helmet, CORS (configurable via `CORS_ORIGIN`)
 - [x] Remove or deprecate `routes/catalog.js` and `services/pokeapi.js` (replaced by hexagonal layers)
 - [x] Verify: `npm run dev` works; `GET /catalog/list` and `GET /catalog/list/:id` return same data as Stage 1 (tested with Bruno)
+- [x] Tests: Jest + supertest (integration and unit tests)
 
 ---
 
@@ -217,7 +229,7 @@ sequenceDiagram
 
 1. **Same external behavior:** All Stage 1 routes work identically.
 2. **Clean dependencies:** Use cases and domain do not import Express, fetch, or any adapter.
-3. **Testability:** Use cases can be tested with a mock catalog port (e.g. in-memory implementation).
+3. **Testability:** Use cases can be tested with a mock catalog port; `createApp({ catalogPort })` allows integration tests with supertest without hitting the real PokeAPI.
 4. **Single responsibility:** Each file has one clear purpose (port, adapter, use case, controller).
 
 ---
