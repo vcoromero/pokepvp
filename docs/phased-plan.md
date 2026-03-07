@@ -84,6 +84,8 @@ pokepvp/
 
 ## Stage 5 — Socket.IO and real-time events
 
+> **Detailed specification:** See [stage-5-spec.md](stage-5-spec.md) for folder structure, realtime port, Socket.IO adapter and handler, events, and implementation checklist.
+
 - Integrate Socket.IO on the server (same port 8080 or path `/socket.io`).
 - **Real-time output port**: interface to notify (e.g. `notifyLobbyStatus`, `notifyBattleStart`, etc.).
 - **Socket.IO adapter** that implements that port (rooms per lobby, emit to clients).
