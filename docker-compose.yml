@@ -1,0 +1,11 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: pokepvp-mongo
+    ports:
+      - "${MONGO_HOST_PORT:-27017}:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
