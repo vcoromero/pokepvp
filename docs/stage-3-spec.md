@@ -207,9 +207,9 @@ Stage 4 will implement lobby/battle **use cases** that depend on these repositor
   - These routes are for **verification only**; they can be removed or restricted in Stage 4 when real use cases and Socket.IO take over.
 - **Option B — Tests only:** No new routes; use **integration tests** (Jest + real or in-memory MongoDB) that call the repository adapters directly and assert save/find behavior.
 
-**Implemented:** Option A — `infrastructure/http/persistence.controller.js` with `POST /lobby`, `GET /lobby/active`, `POST /player`. Routes are mounted only when `MONGODB_URI` is set (repositories are created and passed to `createApp`).
+**Implemented:** Option A — `infrastructure/http/persistence.controller.js` with `POST /lobby`, `GET /lobby/active`, `POST /player`. Routes were mounted only when `MONGODB_URI` was set.
 
-**Limitation — no join-lobby flow:** In Stage 3, `POST /player` only accepts `{ nickname }` and does not accept `lobbyId`; it does not update any lobby’s `playerIds`. The domain entity `Player` has an optional `lobbyId` (set when joined), but the verification routes do not use it. Associating a player to a lobby (join lobby) will be implemented in **Stage 4** (use case “Join lobby (nickname)”); see [phased-plan.md](phased-plan.md).
+**Superseded by Stage 4:** In Stage 3, `POST /player` only accepts `{ nickname }` and does not accept `lobbyId`; it does not update any lobby’s `playerIds`. The domain entity `Player` has an optional `lobbyId` (set when joined), but the verification routes do not use it. Associating a player to a lobby (join lobby) will be implemented in **Stage 4** (use case “Join lobby (nickname)”). As of Stage 4, **LobbyController** at `/lobby` serves the full lobby flow (join, assign-team, ready, get active/by id). PersistenceController is no longer mounted in `app.js`; it remains in the codebase for unit tests. See [stage-4-spec.md](stage-4-spec.md).
 
 ---
 
@@ -266,7 +266,7 @@ sequenceDiagram
 - [x] Implement MongoDB adapters in `infrastructure/persistence/mongodb/adapters/` for each repository port.
 - [x] Wire connection and repositories in `app.js` (or bootstrap module); support override via `createApp({ repositories })` for tests.
 - [x] Verification: Option A implemented — minimal REST routes in `PersistenceController`: `POST /lobby`, `GET /lobby/active`, `POST /player`.
-- [x] `index.js` connects to MongoDB only when `MONGODB_URI` is set; catalog routes work without persistence; persistence routes are mounted only when repositories are available.
+- [x] `index.js` connects to MongoDB only when `MONGODB_URI` is set; catalog routes work without persistence. When repositories exist, lobby flow is mounted via **LobbyController** at `/lobby` (Stage 4); PersistenceController is no longer mounted.
 
 ---
 

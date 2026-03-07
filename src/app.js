@@ -4,13 +4,16 @@ import helmet from 'helmet';
 import { PokeAPIAdapter } from './infrastructure/clients/pokeapi.adapter.js';
 import { GetPokemonListUseCase } from './application/use-cases/get-pokemon-list.use-case.js';
 import { GetPokemonByIdUseCase } from './application/use-cases/get-pokemon-by-id.use-case.js';
+import { JoinLobbyUseCase } from './application/use-cases/join-lobby.use-case.js';
+import { AssignTeamUseCase } from './application/use-cases/assign-team.use-case.js';
+import { MarkReadyUseCase } from './application/use-cases/mark-ready.use-case.js';
 import { CatalogController } from './infrastructure/http/catalog.controller.js';
-import { PersistenceController } from './infrastructure/http/persistence.controller.js';
+import { LobbyController } from './infrastructure/http/lobby.controller.js';
 import { ThirdPartyApiFailedError } from './infrastructure/errors/ThirdPartyApiFailed.error.js';
 import { InvalidConfigError } from './infrastructure/errors/InvalidConfig.error.js';
-import { ValidationError } from './infrastructure/errors/Validation.error.js';
-import { NotFoundError } from './infrastructure/errors/NotFound.error.js';
-import { ConflictError } from './infrastructure/errors/Conflict.error.js';
+import { ValidationError } from './application/errors/Validation.error.js';
+import { NotFoundError } from './application/errors/NotFound.error.js';
+import { ConflictError } from './application/errors/Conflict.error.js';
 import { PlayerMongoRepository } from './infrastructure/persistence/mongodb/adapters/player.mongo.repository.js';
 import { LobbyMongoRepository } from './infrastructure/persistence/mongodb/adapters/lobby.mongo.repository.js';
 import { TeamMongoRepository } from './infrastructure/persistence/mongodb/adapters/team.mongo.repository.js';
@@ -51,11 +54,26 @@ export function createApp(options = {}) {
   app.use('/catalog', catalogController.getRouter());
 
   if (repositories) {
-    const persistenceController = new PersistenceController(
-      repositories.lobbyRepository,
-      repositories.playerRepository
+    const joinLobbyUseCase = new JoinLobbyUseCase(
+      repositories.playerRepository,
+      repositories.lobbyRepository
     );
-    app.use(persistenceController.getRouter());
+    const assignTeamUseCase = new AssignTeamUseCase(
+      catalogPort,
+      repositories.lobbyRepository,
+      repositories.teamRepository
+    );
+    const markReadyUseCase = new MarkReadyUseCase(
+      repositories.lobbyRepository,
+      repositories.teamRepository
+    );
+    const lobbyController = new LobbyController(
+      joinLobbyUseCase,
+      assignTeamUseCase,
+      markReadyUseCase,
+      repositories.lobbyRepository
+    );
+    app.use('/lobby', lobbyController.getRouter());
   }
 
   app.use((err, req, res, next) => {

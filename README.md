@@ -21,11 +21,7 @@ This project is built with:
 - **Event-driven design** — Battle and lobby flows emit domain events (e.g. battle started, turn resolved, Pokémon defeated). Adapters subscribe to these events and push updates to clients, keeping the core decoupled from transport details.
 - **Real-time with Socket.IO** — Lobby and battles use **Socket.IO** for live updates: lobby status, battle start, turn results, and battle end. REST is used where appropriate (e.g. catalog, health).
 
-The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see the architecture doc below.
-
-**Current implementation:** Stages 1, 2, and 3 of the [phased plan](docs/phased-plan.md) are complete: minimal Express + PokeAPI proxy, hexagonal structure (domain ports, Pokémon use cases, CatalogController, PokeAPI adapter), and **MongoDB persistence** (repository ports and adapters for Player, Lobby, Team, Battle, Pokémon state). Endpoints: `GET /health`, `GET /catalog/list`, `GET /catalog/list/:id`; when `MONGODB_URI` is set, verification routes `POST /lobby`, `GET /lobby/active`, `POST /player` are available. **Security:** Helmet (HTTP headers), CORS (configurable via `CORS_ORIGIN`). **Testing:** Jest + supertest (integration and unit tests). Bootstrap: `index.js` (entry), `app.js` (`createApp()` for testability); optional `repositories` injection for tests.
-
-**Stage 3 limitation:** The persistence routes only create a lobby and a player **independently**. There is no endpoint or flow to associate a player with a lobby (e.g. "join lobby"). That behaviour is planned for **Stage 4** (lobby and team flow); see [phased-plan.md](docs/phased-plan.md).
+The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see [docs/architecture.md](docs/architecture.md); for implementation progress, see [docs/phased-plan.md](docs/phased-plan.md).
 
 ## 🛠️ Scripts
 

@@ -2,7 +2,7 @@
 
 This plan is based on [architecture.md](architecture.md) and [business-rules.md](business-rules.md). The final backend will be hexagonal, with Express, MongoDB, and Socket.IO. Incremental stages are planned; the **first** is a simple Express structure with no architecture, only to consume the external Pokémon API.
 
-**Current progress:** Stage 1, Stage 2, and Stage 3 complete. Next: Stage 4 (Lobby and team flow).
+**Current progress:** Stage 1, Stage 2, Stage 3, and Stage 4 complete. Next: Stage 5 (Socket.IO and real-time events).
 
 ---
 
@@ -69,12 +69,16 @@ pokepvp/
 
 ---
 
-## Stage 4 — Lobby and team flow (REST or basic Socket.IO)
+## Stage 4 — Lobby and team flow (REST or basic Socket.IO) ✅ DONE
 
-- **Use cases:** Join lobby (nickname), Assign team (3 random Pokémon, no duplicates between players), Mark ready.
-- Lobby state transitions: `waiting` → `ready` when both players confirm.
-- Can start with REST (POST/GET) for join, assign, ready and then replace or complement with Socket.IO in Stage 5.
-- Business rules: same catalog as in business-rules; random teams; no duplicate Pokémon between the two players.
+> **Detailed specification:** See [stage-4-spec.md](stage-4-spec.md) for use cases, REST API, and implementation checklist.
+
+- [x] **Use cases:** Join lobby (nickname), Assign team (3 random Pokémon, no duplicates between players), Mark ready.
+- [x] Lobby state transitions: `waiting` → `ready` when both players confirm.
+- [x] REST API: `POST /lobby/join`, `POST /lobby/:lobbyId/assign-team`, `POST /lobby/:lobbyId/ready`, `GET /lobby/active`, `GET /lobby/:lobbyId` (LobbyController mounted at `/lobby`).
+- [x] Lobby entity extended with `readyPlayerIds`; MarkReady requires team assigned before ready.
+- [x] Business rules: same catalog as in business-rules; random teams; no duplicate Pokémon between the two players.
+- Socket.IO will be added in Stage 5 to complement or replace REST for real-time events.
 
 ---
 
@@ -147,7 +151,7 @@ flowchart LR
 | **1** | Minimal Express, routes `/catalog/list`, `/catalog/list/:id`, `/health`, proxy to PokeAPI, config via env. | ✅ Done |
 | **2** | Hexagonal structure: domain, catalog port, HTTP adapter, Pokémon use cases (Option B naming). | ✅ Done |
 | **3** | Repository ports and MongoDB implementations. | ✅ Done |
-| **4** | Lobby and team assignment (use cases + REST or Socket.IO). | Pending |
+| **4** | Lobby and team assignment (use cases + REST). | ✅ Done |
 | **5** | Socket.IO, real-time port, lobby/battle events. | Pending |
 | **6** | Full battle: turns, damage, defeat, game end and events. | Pending |
 
