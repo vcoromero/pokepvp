@@ -1,0 +1,16 @@
+meta {
+  name: Post player
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/player
+  body: json
+}
+
+body:json {
+  {
+    "nickname": "PlayerOne"
+  }
+}

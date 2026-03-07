@@ -23,7 +23,9 @@ This project is built with:
 
 The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see the architecture doc below.
 
-**Current implementation:** Stages 1 and 2 of the [phased plan](docs/phased-plan.md) are complete: minimal Express + PokeAPI proxy and hexagonal structure (domain ports, Pokémon use cases, CatalogController, PokeAPI adapter). Endpoints `GET /health`, `GET /catalog/list`, and `GET /catalog/list/:id` are available and tested. **Security:** Helmet (HTTP headers), CORS (configurable via `CORS_ORIGIN`). **Testing:** Jest + supertest (integration and unit tests). Bootstrap split into `index.js` (entry) and `app.js` (`createApp()` for testability).
+**Current implementation:** Stages 1, 2, and 3 of the [phased plan](docs/phased-plan.md) are complete: minimal Express + PokeAPI proxy, hexagonal structure (domain ports, Pokémon use cases, CatalogController, PokeAPI adapter), and **MongoDB persistence** (repository ports and adapters for Player, Lobby, Team, Battle, Pokémon state). Endpoints: `GET /health`, `GET /catalog/list`, `GET /catalog/list/:id`; when `MONGODB_URI` is set, verification routes `POST /lobby`, `GET /lobby/active`, `POST /player` are available. **Security:** Helmet (HTTP headers), CORS (configurable via `CORS_ORIGIN`). **Testing:** Jest + supertest (integration and unit tests). Bootstrap: `index.js` (entry), `app.js` (`createApp()` for testability); optional `repositories` injection for tests.
+
+**Stage 3 limitation:** The persistence routes only create a lobby and a player **independently**. There is no endpoint or flow to associate a player with a lobby (e.g. "join lobby"). That behaviour is planned for **Stage 4** (lobby and team flow); see [phased-plan.md](docs/phased-plan.md).
 
 ## 🛠️ Scripts
 
@@ -31,6 +33,22 @@ The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full pictu
 - `npm test` — Run tests (Jest)
 - `npm run test:watch` — Run tests in watch mode
 - `npm run test:coverage` — Run tests with coverage report
+
+## 🐳 Running MongoDB (Docker Compose)
+
+Persistence (Stage 3+) uses **MongoDB**. The repo provides a **Docker Compose** file that runs only MongoDB (the backend runs on your machine with `npm run dev`).
+
+1. Copy `.env.example` to `.env` and set at least `PORT`, `POKEAPI_BASE_URL`, and `MONGODB_URI`.
+2. Start MongoDB: `docker-compose up -d`
+3. Start the backend: `npm run dev`
+
+**Default:** MongoDB is exposed on host port **27017**. Use `MONGODB_URI=mongodb://localhost:27017/pokepvp` in your `.env`.
+
+**If port 27017 is already in use** (e.g. you have another MongoDB container or service):
+
+- In your `.env`, set a free host port, e.g. `MONGO_HOST_PORT=27018`.
+- In the same `.env`, set the app to use that port: `MONGODB_URI=mongodb://localhost:27018/pokepvp`.
+- Then run `docker-compose up -d`. The Compose file reads `MONGO_HOST_PORT` and maps that host port to MongoDB; the app connects via `MONGODB_URI`, so both must use the same port number.
 
 ## 📚 Documentation
 

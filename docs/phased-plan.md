@@ -2,7 +2,7 @@
 
 This plan is based on [architecture.md](architecture.md) and [business-rules.md](business-rules.md). The final backend will be hexagonal, with Express, MongoDB, and Socket.IO. Incremental stages are planned; the **first** is a simple Express structure with no architecture, only to consume the external Pokémon API.
 
-**Current progress:** Stage 1 and Stage 2 complete. Next: Stage 3 (MongoDB and persistence).
+**Current progress:** Stage 1, Stage 2, and Stage 3 complete. Next: Stage 4 (Lobby and team flow).
 
 ---
 
@@ -56,12 +56,16 @@ pokepvp/
 
 ---
 
-## Stage 3 — MongoDB and persistence
+## Stage 3 — MongoDB and persistence ✅ DONE
 
-- Define **persistence ports** (repositories) for: Player, Lobby, Team selection, Battle, Pokémon state (per [architecture.md](architecture.md) and [business-rules.md](business-rules.md)).
-- Implement **MongoDB adapters** for those repositories (schemas, basic indexes).
-- Configuration via environment variables (e.g. `MONGODB_URI`).
-- Lobby/battle use cases (Stage 4) will depend on these ports; in this stage you can expose minimal REST routes or tests that verify read/write.
+> **Detailed specification:** See [stage-3-spec.md](stage-3-spec.md) for folder structure, entities, repository ports, MongoDB adapters, and implementation checklist.
+
+- [x] Define **persistence ports** (repositories) for: Player, Lobby, Team selection, Battle, Pokémon state (per [architecture.md](architecture.md) and [business-rules.md](business-rules.md)).
+- [x] Implement **MongoDB adapters** for those repositories (schemas, basic indexes).
+- [x] Configuration via environment variables (`MONGODB_URI`); optional `MONGO_HOST_PORT` for Docker Compose; connection in `infrastructure/persistence/mongodb/connection.js`.
+- [x] Domain entities in `domain/entities/`; repository ports in `domain/ports/`; Mongoose schemas and adapters in `infrastructure/persistence/mongodb/`.
+- [x] Bootstrap: `index.js` connects to MongoDB when `MONGODB_URI` is set; `createApp(options)` accepts optional `repositories` for tests.
+- [x] Verification: minimal REST routes (Option A) — `PersistenceController` with `POST /lobby`, `GET /lobby/active`, `POST /player`.
 
 ---
 
@@ -142,7 +146,7 @@ flowchart LR
 | ----- | ------- | ------ |
 | **1** | Minimal Express, routes `/catalog/list`, `/catalog/list/:id`, `/health`, proxy to PokeAPI, config via env. | ✅ Done |
 | **2** | Hexagonal structure: domain, catalog port, HTTP adapter, Pokémon use cases (Option B naming). | ✅ Done |
-| **3** | Repository ports and MongoDB implementations. | Pending |
+| **3** | Repository ports and MongoDB implementations. | ✅ Done |
 | **4** | Lobby and team assignment (use cases + REST or Socket.IO). | Pending |
 | **5** | Socket.IO, real-time port, lobby/battle events. | Pending |
 | **6** | Full battle: turns, damage, defeat, game end and events. | Pending |
