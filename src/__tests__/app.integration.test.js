@@ -3,9 +3,7 @@ import request from 'supertest';
 import { createApp } from '../app.js';
 import { ThirdPartyApiFailedError } from '../infrastructure/errors/ThirdPartyApiFailed.error.js';
 import { InvalidConfigError } from '../infrastructure/errors/InvalidConfig.error.js';
-import { ValidationError } from '../infrastructure/errors/Validation.error.js';
-import { NotFoundError } from '../infrastructure/errors/NotFound.error.js';
-import { ConflictError } from '../infrastructure/errors/Conflict.error.js';
+import { NotFoundError } from '../application/errors/NotFound.error.js';
 
 describe('App integration', () => {
   let app;
@@ -85,10 +83,11 @@ describe('App integration', () => {
     });
   });
 
-  describe('persistence routes (with mock repositories)', () => {
+  describe('lobby routes (with mock repositories)', () => {
     let appWithRepos;
     let mockLobbyRepository;
     let mockPlayerRepository;
+    let mockTeamRepository;
 
     beforeEach(() => {
       mockLobbyRepository = {
@@ -101,42 +100,21 @@ describe('App integration', () => {
         findById: jest.fn(),
         findByLobbyId: jest.fn(),
       };
+      mockTeamRepository = {
+        save: jest.fn(),
+        findByLobby: jest.fn(),
+        findByLobbyAndPlayer: jest.fn(),
+      };
       appWithRepos = createApp({
         catalogPort: mockCatalogPort,
         repositories: {
           lobbyRepository: mockLobbyRepository,
           playerRepository: mockPlayerRepository,
-          teamRepository: {},
+          teamRepository: mockTeamRepository,
           battleRepository: {},
           pokemonStateRepository: {},
         },
       });
-    });
-
-    it('POST /player returns 201 and saved player', async () => {
-      const saved = { id: 'p1', nickname: 'Ash' };
-      mockPlayerRepository.save.mockResolvedValue(saved);
-
-      const response = await request(appWithRepos)
-        .post('/player')
-        .send({ nickname: 'Ash' })
-        .set('Accept', 'application/json');
-
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(saved);
-    });
-
-    it('POST /lobby returns 201 and saved lobby', async () => {
-      const saved = { id: 'l1', status: 'waiting', playerIds: [] };
-      mockLobbyRepository.save.mockResolvedValue(saved);
-
-      const response = await request(appWithRepos)
-        .post('/lobby')
-        .send({ status: 'waiting', playerIds: [] })
-        .set('Accept', 'application/json');
-
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(saved);
     });
 
     it('GET /lobby/active returns 200 when lobby exists', async () => {
@@ -160,19 +138,6 @@ describe('App integration', () => {
       expect(response.body.error).toBe('No active lobby');
     });
 
-    it('error middleware returns 400 for ValidationError', async () => {
-      mockPlayerRepository.save.mockRejectedValue(
-        new ValidationError('Invalid input', 400)
-      );
-
-      const response = await request(appWithRepos)
-        .post('/player')
-        .send({ nickname: 'x' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Invalid input');
-    });
-
     it('error middleware returns 404 for NotFoundError', async () => {
       mockLobbyRepository.findActive.mockRejectedValue(
         new NotFoundError('Not found', 404)
@@ -184,17 +149,88 @@ describe('App integration', () => {
       expect(response.body.error).toBe('Not found');
     });
 
-    it('error middleware returns 409 for ConflictError', async () => {
-      mockPlayerRepository.save.mockRejectedValue(
-        new ConflictError('Duplicate', 409)
-      );
+    it('POST /lobby/join returns 201 and joins player', async () => {
+      mockLobbyRepository.findActive.mockResolvedValue(null);
+      mockLobbyRepository.save
+        .mockResolvedValueOnce({ id: 'l1', status: 'waiting', playerIds: [], readyPlayerIds: [] })
+        .mockResolvedValueOnce({ id: 'l1', status: 'waiting', playerIds: ['p1'], readyPlayerIds: [] });
+      mockPlayerRepository.save.mockResolvedValue({ id: 'p1', nickname: 'Ash', lobbyId: 'l1' });
 
       const response = await request(appWithRepos)
-        .post('/player')
+        .post('/lobby/join')
         .send({ nickname: 'Ash' });
 
-      expect(response.status).toBe(409);
-      expect(response.body.error).toBe('Duplicate');
+      expect(response.status).toBe(201);
+      expect(response.body.player).toEqual({ id: 'p1', nickname: 'Ash', lobbyId: 'l1' });
+      expect(response.body.lobby.playerIds).toEqual(['p1']);
+    });
+
+    it('POST /lobby/:id/assign-team returns 200 with team', async () => {
+      mockLobbyRepository.findById.mockResolvedValue({
+        id: 'l1',
+        status: 'waiting',
+        playerIds: ['p1', 'p2'],
+        readyPlayerIds: [],
+      });
+      mockTeamRepository.findByLobby.mockResolvedValue([{ playerId: 'p1', pokemonIds: [1, 2, 3] }]);
+      mockCatalogPort.getList.mockResolvedValue([
+        { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 },
+      ]);
+      mockTeamRepository.save.mockResolvedValue({
+        id: 't2',
+        lobbyId: 'l1',
+        playerId: 'p2',
+        pokemonIds: [4, 5, 6],
+      });
+
+      const response = await request(appWithRepos)
+        .post('/lobby/l1/assign-team')
+        .send({ playerId: 'p2' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.pokemonIds).toEqual([4, 5, 6]);
+    });
+
+    it('POST /lobby/:id/ready returns 200 and updates lobby status to ready', async () => {
+      mockLobbyRepository.findById.mockResolvedValue({
+        id: 'l1',
+        status: 'waiting',
+        playerIds: ['p1', 'p2'],
+        readyPlayerIds: ['p1'],
+      });
+      mockTeamRepository.findByLobbyAndPlayer.mockResolvedValue({ id: 't2' });
+      mockLobbyRepository.save
+        .mockResolvedValueOnce({
+          id: 'l1',
+          status: 'waiting',
+          playerIds: ['p1', 'p2'],
+          readyPlayerIds: ['p1', 'p2'],
+        })
+        .mockResolvedValueOnce({
+          id: 'l1',
+          status: 'ready',
+          playerIds: ['p1', 'p2'],
+          readyPlayerIds: ['p1', 'p2'],
+        });
+
+      const response = await request(appWithRepos)
+        .post('/lobby/l1/ready')
+        .send({ playerId: 'p2' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('ready');
+    });
+
+    it('returns 404 for deprecated Stage 3 routes', async () => {
+      const playerResponse = await request(appWithRepos)
+        .post('/player')
+        .send({ nickname: 'Ash' });
+      const lobbyResponse = await request(appWithRepos)
+        .post('/lobby')
+        .send({ status: 'waiting', playerIds: [] });
+
+      expect(playerResponse.status).toBe(404);
+      expect(lobbyResponse.status).toBe(404);
     });
   });
 });

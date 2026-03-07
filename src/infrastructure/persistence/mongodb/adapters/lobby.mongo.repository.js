@@ -8,6 +8,7 @@ function toDomain(doc) {
     id: obj._id?.toString(),
     status: obj.status,
     playerIds: (obj.playerIds || []).map((id) => (id?.toString ? id.toString() : id)),
+    readyPlayerIds: (obj.readyPlayerIds || []).map((id) => (id?.toString ? id.toString() : id)),
     createdAt: obj.createdAt,
   };
 }
@@ -18,6 +19,7 @@ export class LobbyMongoRepository {
       const payload = {
         status: lobby.status,
         playerIds: lobby.playerIds ?? [],
+        readyPlayerIds: lobby.readyPlayerIds ?? [],
         ...(lobby.createdAt && { createdAt: lobby.createdAt }),
       };
       let doc;

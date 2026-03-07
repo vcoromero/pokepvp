@@ -7,6 +7,7 @@ const lobbySchema = new mongoose.Schema({
     enum: ['waiting', 'ready', 'battling', 'finished'],
   },
   playerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
+  readyPlayerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: [] }],
   createdAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
