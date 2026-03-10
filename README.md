@@ -21,7 +21,7 @@ This project is built with:
 - **Event-driven design** — Battle and lobby flows emit domain events (e.g. battle started, turn resolved, Pokémon defeated). Adapters subscribe to these events and push updates to clients, keeping the core decoupled from transport details.
 - **Real-time with Socket.IO** — Lobby and battles use **Socket.IO** for live updates: lobby status, battle start, turn results, and battle end. REST is used where appropriate (e.g. catalog, health).
 
-The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see [docs/architecture.md](docs/architecture.md); for implementation progress, see [docs/phased-plan.md](docs/phased-plan.md).
+The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see [docs/architecture.md](docs/architecture.md). All six stages of the [phased plan](docs/phased-plan.md) are implemented (catalog, lobby, team selection, Socket.IO real-time, and full battle with turns, damage, and game end).
 
 ## 🛠️ Scripts
 
@@ -51,7 +51,7 @@ Persistence (Stage 3+) uses **MongoDB**. The repo provides a **Docker Compose** 
 - **[docs/business-rules.md](docs/business-rules.md)** — Canonical business rules: catalog, team selection, lobby states, battle flow, damage formula, events, and persistence. Used by both backend and frontend.
 - **[docs/architecture.md](docs/architecture.md)** — Backend architecture: hexagonal layout, event-driven communication, SOLID/Clean Code, and a layers diagram.
 - **[docs/phased-plan.md](docs/phased-plan.md)** — Phased implementation plan: Stage 1 (minimal Express + PokeAPI proxy) through Stage 6 (full battle and events).
-- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO events (join_lobby, assign_pokemon, ready, attack) using Postman or similar.
+- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, assign_pokemon, ready, attack) using Postman or similar.
 
 ## 🚀 Future improvements
 

@@ -47,7 +47,7 @@ The lobby shall have exactly the following states:
 
 - The battle shall **start automatically** when both players are in the **ready** state.
 - **First turn:** The player whose **active Pokémon has the highest Speed** stat shall play first. If tied, the system shall define a deterministic rule (e.g. player order).
-- **Subsequent turns:** Turns shall be **strictly sequential** — only one attack may be processed at a time.
+- **Subsequent turns:** Turns shall be **strictly sequential** — the player who did not attack in the previous turn shall attack next; only one attack may be processed at a time (turns alternate between the two players; Speed is not recalculated for later turns).
 - Attacks shall be **triggered by the client** (e.g. a button); the client sends the action to the server.
 - The server shall **process each attack atomically** before allowing the next turn (no concurrent turn processing).
 - The system may use a **single lobby** that handles one match at a time (no requirement for multiple concurrent lobbies).

@@ -32,6 +32,8 @@ describe('SocketHandler', () => {
   let joinLobbyUseCase;
   let assignTeamUseCase;
   let markReadyUseCase;
+  let startBattleUseCase;
+  let processAttackUseCase;
   let realtimePort;
   let lobbyRepository;
   let handler;
@@ -40,6 +42,8 @@ describe('SocketHandler', () => {
     joinLobbyUseCase = { execute: jest.fn() };
     assignTeamUseCase = { execute: jest.fn() };
     markReadyUseCase = { execute: jest.fn() };
+    startBattleUseCase = { execute: jest.fn() };
+    processAttackUseCase = { execute: jest.fn() };
     realtimePort = {
       notifyLobbyStatus: jest.fn(),
       notifyBattleStart: jest.fn(),
@@ -51,6 +55,8 @@ describe('SocketHandler', () => {
       joinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
+      startBattleUseCase,
+      processAttackUseCase,
       realtimePort,
       lobbyRepository
     );
@@ -203,8 +209,29 @@ describe('SocketHandler', () => {
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
+      const lobby = { id: 'l1', status: 'waiting', playerIds: ['p1', 'p2'], readyPlayerIds: ['p1'] };
+      markReadyUseCase.execute.mockResolvedValue(lobby);
+
+      const ack = jest.fn();
+      socket._trigger('ready', { lobbyId: 'l1', playerId: 'p1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(markReadyUseCase.execute).toHaveBeenCalledWith({ lobbyId: 'l1', playerId: 'p1' });
+      expect(realtimePort.notifyLobbyStatus).toHaveBeenCalledWith('l1', { lobby });
+      expect(ack).toHaveBeenCalledWith(lobby);
+      expect(startBattleUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('calls startBattleUseCase when lobby becomes ready', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
       const lobby = { id: 'l1', status: 'ready', playerIds: ['p1', 'p2'], readyPlayerIds: ['p1', 'p2'] };
       markReadyUseCase.execute.mockResolvedValue(lobby);
+      startBattleUseCase.execute.mockResolvedValue({ battle: {}, pokemonStates: [] });
 
       const ack = jest.fn();
       socket._trigger('ready', { lobbyId: 'l1', playerId: 'p2' }, ack);
@@ -213,6 +240,7 @@ describe('SocketHandler', () => {
 
       expect(markReadyUseCase.execute).toHaveBeenCalledWith({ lobbyId: 'l1', playerId: 'p2' });
       expect(realtimePort.notifyLobbyStatus).toHaveBeenCalledWith('l1', { lobby });
+      expect(startBattleUseCase.execute).toHaveBeenCalledWith({ lobbyId: 'l1' });
       expect(ack).toHaveBeenCalledWith(lobby);
     });
 
@@ -235,25 +263,75 @@ describe('SocketHandler', () => {
   });
 
   describe('handleAttack', () => {
-    it('emits attack_not_available error without calling any use case', () => {
+    it('calls processAttackUseCase and acks with turn result', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      lobbyRepository.findById.mockResolvedValue({ id: 'l1', playerIds: ['p1', 'p2'] });
+      const turnResult = {
+        battleId: 'b1',
+        lobbyId: 'l1',
+        attacker: { playerId: 'p1', pokemonId: 1 },
+        defender: { playerId: 'p2', pokemonId: 4, damage: 10, previousHp: 30, currentHp: 20, defeated: false },
+        nextActivePokemon: { playerId: 'p2', pokemonId: null },
+        battleFinished: false,
+      };
+      processAttackUseCase.execute.mockResolvedValue(turnResult);
+
+      const ack = jest.fn();
+      socket._trigger('attack', { lobbyId: 'l1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(lobbyRepository.findById).toHaveBeenCalledWith('l1');
+      expect(processAttackUseCase.execute).toHaveBeenCalledWith({
+        lobbyId: 'l1',
+        attackerPlayerId: 'p1',
+        defenderPlayerId: 'p2',
+      });
+      expect(ack).toHaveBeenCalledWith(turnResult);
+      expect(socket.emit).not.toHaveBeenCalledWith('error', expect.anything());
+    });
+
+    it('emits error and acks with error when processAttackUseCase throws', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      lobbyRepository.findById.mockResolvedValue({ id: 'l1', playerIds: ['p1', 'p2'] });
+      processAttackUseCase.execute.mockRejectedValue(new ConflictError('Not this player\'s turn'));
+
+      const ack = jest.fn();
+      socket._trigger('attack', { lobbyId: 'l1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ConflictError', message: 'Not this player\'s turn' });
+      expect(ack).toHaveBeenCalledWith({ error: { code: 'ConflictError', message: 'Not this player\'s turn' } });
+    });
+
+    it('emits ValidationError when socket is not in lobby', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'other';
+      socket.data.playerId = 'p1';
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
       const ack = jest.fn();
-      socket._trigger('attack', { lobbyId: 'l1', playerId: 'p1' }, ack);
+      socket._trigger('attack', { lobbyId: 'l1' }, ack);
 
-      expect(socket.emit).toHaveBeenCalledWith('error', {
-        code: 'attack_not_available',
-        message: 'Attack not implemented yet (Stage 6)',
-      });
-      expect(ack).toHaveBeenCalledWith({
-        error: { code: 'attack_not_available', message: 'Attack not implemented yet (Stage 6)' },
-      });
-      expect(joinLobbyUseCase.execute).not.toHaveBeenCalled();
-      expect(assignTeamUseCase.execute).not.toHaveBeenCalled();
-      expect(markReadyUseCase.execute).not.toHaveBeenCalled();
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(processAttackUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ValidationError', message: 'Socket is not in this lobby' });
     });
   });
 });

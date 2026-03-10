@@ -2,7 +2,7 @@
 
 This plan is based on [architecture.md](architecture.md) and [business-rules.md](business-rules.md). The final backend will be hexagonal, with Express, MongoDB, and Socket.IO. Incremental stages are planned; the **first** is a simple Express structure with no architecture, only to consume the external Pokémon API.
 
-**Current progress:** Stage 1, Stage 2, Stage 3, Stage 4, and Stage 5 complete. Next: Stage 6 (full battle: turns, damage, defeat, game end).
+**Current progress:** All stages complete (Stage 1–6). Stage 6 delivers the full battle flow: turns (first by Speed, then alternating), damage, defeat, and game end.
 
 ---
 
@@ -94,11 +94,11 @@ pokepvp/
 
 ---
 
-## Stage 6 — Battle: turns, damage, and game end
+## Stage 6 — Battle: turns, damage, and game end ✅ DONE
 
 - **Use cases:** Start battle (when lobby is `ready`), Process attack (atomic), Resolve defeat, End battle.
 - Damage formula: `Damage = Attacker Attack - Defender Defense`; minimum 1; HP never below 0.
-- Turn order: higher Speed first; tie with a deterministic rule.
+- Turn order: first turn by Speed (tie with a deterministic rule); then turns alternate between players.
 - Domain events (e.g. `BattleStarted`, `TurnResolved`, `PokemonDefeated`, `BattleEnded`) and Socket.IO adapter subscription to emit to clients.
 - Persist battle state and each Pokémon state (current HP, defeated).
 
@@ -155,6 +155,6 @@ flowchart LR
 | **3** | Repository ports and MongoDB implementations. | ✅ Done |
 | **4** | Lobby and team assignment (use cases + REST). | ✅ Done |
 | **5** | Socket.IO, real-time port, lobby/battle events. | ✅ Done |
-| **6** | Full battle: turns, damage, defeat, game end and events. | Pending |
+| **6** | Full battle: turns, damage, defeat, game end and events. | ✅ Done |
 
 **Stage 1** is deliberately flat (no domain/ports/adapters folders) to quickly validate Express and integration with the PokeAPI; from Stage 2 onward the architecture described in [architecture.md](architecture.md) is introduced.

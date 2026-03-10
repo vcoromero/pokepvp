@@ -122,6 +122,8 @@ flowchart LR
   WebClient --> SocketIOHandler
   ExpressREST --> JoinLobby
   ExpressREST --> AssignTeam
+  SocketIOHandler --> JoinLobby
+  SocketIOHandler --> AssignTeam
   SocketIOHandler --> Ready
   SocketIOHandler --> Attack
   JoinLobby --> Entities

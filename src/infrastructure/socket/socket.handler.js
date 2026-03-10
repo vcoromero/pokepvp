@@ -1,3 +1,6 @@
+import { ValidationError } from '../../application/errors/Validation.error.js';
+import { NotFoundError } from '../../application/errors/NotFound.error.js';
+
 const ROOM_PREFIX = 'lobby:';
 
 function errorPayload(err) {
@@ -6,10 +9,20 @@ function errorPayload(err) {
 }
 
 export class SocketHandler {
-  constructor(joinLobbyUseCase, assignTeamUseCase, markReadyUseCase, realtimePort, lobbyRepository) {
+  constructor(
+    joinLobbyUseCase,
+    assignTeamUseCase,
+    markReadyUseCase,
+    startBattleUseCase,
+    processAttackUseCase,
+    realtimePort,
+    lobbyRepository
+  ) {
     this.joinLobbyUseCase = joinLobbyUseCase;
     this.assignTeamUseCase = assignTeamUseCase;
     this.markReadyUseCase = markReadyUseCase;
+    this.startBattleUseCase = startBattleUseCase;
+    this.processAttackUseCase = processAttackUseCase;
     this.realtimePort = realtimePort;
     this.lobbyRepository = lobbyRepository;
   }
@@ -18,8 +31,32 @@ export class SocketHandler {
     io.on('connection', (socket) => {
       socket.on('join_lobby', (payload, ack) => this.handleJoinLobby(socket, payload, ack));
       socket.on('assign_pokemon', (payload, ack) => this.handleAssignPokemon(socket, payload, ack));
-      socket.on('ready', (payload, ack) => this.handleReady(socket, payload, ack));
-      socket.on('attack', (payload, ack) => this.handleAttack(socket, payload, ack));
+      socket.on('ready', (payload, ack) => {
+        this.handleReady(socket, payload, ack).catch((err) => {
+          console.error('[ready] handler error', err?.stack ?? err);
+          socket.emit('error', errorPayload(err));
+          if (typeof ack === 'function') {
+            try {
+              ack({ error: errorPayload(err) });
+            } catch (ackErr) {
+              console.error('[ready] ack error', ackErr);
+            }
+          }
+        });
+      });
+      socket.on('attack', (payload, ack) => {
+        this.handleAttack(socket, payload, ack).catch((err) => {
+          console.error('[attack] handler error', err);
+          socket.emit('error', errorPayload(err));
+          if (typeof ack === 'function') {
+            try {
+              ack({ error: errorPayload(err) });
+            } catch (ackErr) {
+              console.error('[attack] ack error', ackErr);
+            }
+          }
+        });
+      });
     });
   }
 
@@ -77,21 +114,92 @@ export class SocketHandler {
 
       this.realtimePort.notifyLobbyStatus(lobbyId, { lobby });
 
+      if (lobby?.status === 'ready' || lobby?.status === 'battling') {
+        await this.startBattleUseCase.execute({ lobbyId });
+      }
+
       if (typeof ack === 'function') {
-        ack(lobby);
+        try {
+          ack(JSON.parse(JSON.stringify(lobby)));
+        } catch (ackErr) {
+          console.error('[ready] ack error', ackErr?.stack ?? ackErr);
+          socket.emit('error', errorPayload(ackErr));
+        }
       }
     } catch (err) {
+      console.error('[ready] error', err?.stack ?? err);
       socket.emit('error', errorPayload(err));
       if (typeof ack === 'function') {
-        ack({ error: errorPayload(err) });
+        try {
+          ack({ error: errorPayload(err) });
+        } catch (ackErr) {
+          console.error('[ready] ack error in catch', ackErr?.stack ?? ackErr);
+        }
       }
     }
   }
 
-  handleAttack(socket, _payload, ack) {
-    socket.emit('error', { code: 'attack_not_available', message: 'Attack not implemented yet (Stage 6)' });
-    if (typeof ack === 'function') {
-      ack({ error: { code: 'attack_not_available', message: 'Attack not implemented yet (Stage 6)' } });
+  async handleAttack(socket, payload, ack) {
+    const lobbyId = payload?.lobbyId;
+    try {
+      const attackerPlayerId = socket.data.playerId;
+
+      if (!lobbyId) {
+        throw new ValidationError('lobbyId is required');
+      }
+      if (!attackerPlayerId) {
+        throw new ValidationError(
+          'This connection has no player context. Send join_lobby with a nickname on this same connection first, then assign_pokemon and ready before attack.'
+        );
+      }
+      if (socket.data.lobbyId !== lobbyId) {
+        throw new ValidationError('Socket is not in this lobby');
+      }
+
+      const lobby = await this.lobbyRepository.findById(lobbyId);
+      if (!lobby) {
+        throw new NotFoundError('Lobby not found');
+      }
+      const defenderPlayerId = (lobby.playerIds ?? []).find((id) => id !== attackerPlayerId);
+      if (!defenderPlayerId) {
+        throw new ValidationError('No opponent in this lobby');
+      }
+
+      const turnResult = await this.processAttackUseCase.execute({
+        lobbyId,
+        attackerPlayerId,
+        defenderPlayerId,
+      });
+
+      // Ensure ack payload is plain JSON so client (e.g. Postman) does not disconnect on serialization
+      const safePayload = JSON.parse(JSON.stringify({
+        battleId: turnResult.battleId,
+        lobbyId: turnResult.lobbyId,
+        attacker: turnResult.attacker,
+        defender: turnResult.defender,
+        nextActivePokemon: turnResult.nextActivePokemon,
+        battleFinished: turnResult.battleFinished,
+        ...(turnResult.nextToActPlayerId != null && { nextToActPlayerId: turnResult.nextToActPlayerId }),
+      }));
+
+      if (typeof ack === 'function') {
+        try {
+          ack(safePayload);
+        } catch (ackErr) {
+          console.error('[attack] ack serialization/emit error', ackErr?.stack ?? ackErr);
+          socket.emit('error', errorPayload(ackErr));
+        }
+      }
+    } catch (err) {
+      console.error('[attack] handler error', err?.stack ?? err);
+      socket.emit('error', errorPayload(err));
+      if (typeof ack === 'function') {
+        try {
+          ack({ error: errorPayload(err) });
+        } catch (ackErr) {
+          console.error('[attack] ack error in catch', ackErr?.stack ?? ackErr);
+        }
+      }
     }
   }
 }
