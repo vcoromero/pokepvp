@@ -1,6 +1,6 @@
 # Stage 5 — Socket.IO and Real-Time Events (Detailed Specification)
 
-This document details what must be built in **Stage 5** of the PokePVP phased plan. It expands on [phased-plan.md](phased-plan.md) and aligns with [architecture.md](architecture.md) and [business-rules.md](business-rules.md). **Status:** Pending.
+This document details what must be built in **Stage 5** of the PokePVP phased plan. It expands on [phased-plan.md](phased-plan.md) and aligns with [architecture.md](architecture.md) and [business-rules.md](business-rules.md). **Status:** ✅ Done.
 
 ---
 
@@ -115,7 +115,7 @@ Implements the RealtimePort using Socket.IO. It receives the Socket.IO server (o
 
 The handler attaches to the Socket.IO server and listens for **client → server** events. It translates them into use case calls and then invokes the **RealtimePort** to notify the lobby room. It also joins each client’s socket to the appropriate lobby room when they join the lobby.
 
-**Dependencies (injected):** JoinLobbyUseCase, AssignTeamUseCase, MarkReadyUseCase, RealtimePort (Socket.IO adapter), and optionally LobbyRepository for validation. Same use cases as LobbyController so behaviour is consistent between REST and Socket.
+**Dependencies (injected):** JoinLobbyUseCase, AssignTeamUseCase, MarkReadyUseCase, RealtimePort (Socket.IO adapter), and LobbyRepository (used in assign_pokemon to fetch lobby after team assignment for notifyLobbyStatus). Same use cases as LobbyController so behaviour is consistent between REST and Socket.
 
 ### 5.2 Client → Server Events and Flow
 
@@ -219,23 +219,23 @@ sequenceDiagram
 Execute in order; each step is verifiable.
 
 ### Step 1 — Domain: RealtimePort
-- [ ] Create `domain/ports/realtime.port.js`. Document the contract: `notifyLobbyStatus(lobbyId, payload)`, `notifyBattleStart(lobbyId, payload)`, `notifyTurnResult(lobbyId, payload)`, `notifyBattleEnd(lobbyId, payload)`. No implementation; JSDoc or comment is enough.
+- [x] Create `domain/ports/realtime.port.js`. Document the contract: `notifyLobbyStatus(lobbyId, payload)`, `notifyBattleStart(lobbyId, payload)`, `notifyTurnResult(lobbyId, payload)`, `notifyBattleEnd(lobbyId, payload)`. No implementation; JSDoc or comment is enough.
 
 ### Step 2 — Infrastructure: Socket.IO adapter
-- [ ] Create `infrastructure/socket/socketio.adapter.js`. Implement the RealtimePort: constructor receives Socket.IO server (or namespace); implement the four methods by emitting to room `lobby:${lobbyId}` with events `lobby_status`, `battle_start`, `turn_result`, `battle_end` and the given payload.
+- [x] Create `infrastructure/socket/socketio.adapter.js`. Implement the RealtimePort: constructor receives Socket.IO server (or namespace); implement the four methods by emitting to room `lobby:${lobbyId}` with events `lobby_status`, `battle_start`, `turn_result`, `battle_end` and the given payload.
 
 ### Step 3 — Infrastructure: Socket handler
-- [ ] Create `infrastructure/socket/socket.handler.js`. Accept dependencies: JoinLobbyUseCase, AssignTeamUseCase, MarkReadyUseCase, realtimePort. Attach to `io` on connection: register listeners for `join_lobby`, `assign_pokemon`, `ready`, `attack`. For join_lobby: call use case, join socket to `lobby:${lobby.id}`, call realtimePort.notifyLobbyStatus; reply to client with result or error. For assign_pokemon and ready: call use case, then notifyLobbyStatus; handle errors. For attack: emit error or "not implemented" (Stage 6 will implement).
+- [x] Create `infrastructure/socket/socket.handler.js`. Accept dependencies: JoinLobbyUseCase, AssignTeamUseCase, MarkReadyUseCase, realtimePort, lobbyRepository. Attach to `io` on connection: register listeners for `join_lobby`, `assign_pokemon`, `ready`, `attack`. For join_lobby: call use case, join socket to `lobby:${lobby.id}`, store lobbyId/playerId in socket.data, call realtimePort.notifyLobbyStatus; reply via ack or emit error. For assign_pokemon: call use case, join socket to room if not already, fetch lobby from lobbyRepository, notifyLobbyStatus; for ready: call use case, notifyLobbyStatus. For attack: emit error with code `attack_not_available` (Stage 6 will implement).
 
 ### Step 4 — Bootstrap: index.js
-- [ ] In `index.js`, create HTTP server from Express app; instantiate Socket.IO with the server (path `/socket.io`, CORS if needed). When repositories exist, create the same use cases as app.js (or obtain them from a shared wiring), create the Socket.IO adapter and handler, and attach the handler to `io`. Call `server.listen(PORT, HOST)` instead of `app.listen`.
+- [x] In `index.js`, create HTTP server from Express app; instantiate Socket.IO with the server (path `/socket.io`, CORS if needed). When repositories exist, create the same use cases as app.js, create the Socket.IO adapter and handler (with lobbyRepository), and attach the handler to `io`. Call `server.listen(PORT, HOST)` instead of `app.listen`.
 
 ### Step 5 — Verification
-- [ ] Run existing test suite; ensure no regressions (createApp() still returns Express app for supertest).
-- [ ] Manually or with a Socket.IO client: connect to `http://localhost:8080`, emit `join_lobby` with nickname, then `assign_pokemon` and `ready` with lobbyId/playerId; confirm `lobby_status` is received in the same socket and, with two clients in the same lobby, that both receive `lobby_status`.
+- [x] Run existing test suite; ensure no regressions (createApp() still returns Express app for supertest).
+- [x] Manually or with a Socket.IO client: connect to `http://localhost:8080`, emit `join_lobby` with nickname, then `assign_pokemon` and `ready` with lobbyId/playerId; confirm `lobby_status` is received in the same socket and, with two clients in the same lobby, that both receive `lobby_status`.
 
 ### Step 6 — Optional: link from phased-plan
-- [ ] In `docs/phased-plan.md`, add under Stage 5: "> **Detailed specification:** See [stage-5-spec.md](stage-5-spec.md) for folder structure, realtime port, Socket.IO adapter and handler, events, and implementation checklist."
+- [x] In `docs/phased-plan.md`, add under Stage 5: "> **Detailed specification:** See [stage-5-spec.md](stage-5-spec.md) for folder structure, realtime port, Socket.IO adapter and handler, events, and implementation checklist."
 
 ---
 
@@ -250,9 +250,23 @@ Execute in order; each step is verifiable.
 
 ---
 
-## 12. References
+## 12. Implementation Notes (as built)
+
+- **RealtimePort:** JSDoc typedef in `domain/ports/realtime.port.js`; no runtime interface (plain JS).
+- **SocketIOAdapter:** Exports `SocketIOAdapter` class; constructor receives `io`; helper `roomName(lobbyId)` returns `lobby:${lobbyId}`; all four notify methods emit to the room.
+- **SocketHandler:** Exports `SocketHandler` class; constructor receives use cases, realtimePort, and lobbyRepository. `attach(io)` registers `connection` listener; each event handler uses optional `ack` callback for responses. Error payload: `{ code, message }`; emitted via `error` event and passed to ack on failure.
+- **join_lobby:** Payload `{ lobby, player }` sent to room; ack returns `{ player, lobby }`.
+- **assign_pokemon:** Fetches lobby from lobbyRepository after assign; joins socket to room if not already; payload `{ lobby }` to room; ack returns team.
+- **ready:** Payload `{ lobby }` to room; ack returns updated lobby.
+- **attack:** Emits `error` with `{ code: 'attack_not_available', message: 'Attack not implemented yet (Stage 6)' }`; ack receives same error object.
+- **Testing:** See [socketio-test-flow.md](socketio-test-flow.md) for manual test flow with Postman or similar.
+
+---
+
+## 13. References
 
 - [phased-plan.md](phased-plan.md) — Stage 5 summary
 - [architecture.md](architecture.md) — Hexagonal architecture, real-time port, input/output adapters
 - [business-rules.md](business-rules.md) — §7 Events (client–server contract), §4 Battle flow, §3 Lobby states
 - [stage-4-spec.md](stage-4-spec.md) — Lobby and team use cases, REST API, bootstrap
+- [socketio-test-flow.md](socketio-test-flow.md) — Manual test flow for Socket.IO events
