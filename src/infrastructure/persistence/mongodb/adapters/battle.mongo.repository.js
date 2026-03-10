@@ -9,6 +9,7 @@ function toDomain(doc) {
     lobbyId: obj.lobbyId?.toString(),
     startedAt: obj.startedAt,
     winnerId: obj.winnerId?.toString() ?? undefined,
+    nextToActPlayerId: obj.nextToActPlayerId?.toString() ?? undefined,
   };
 }
 
@@ -19,6 +20,7 @@ export class BattleMongoRepository {
         lobbyId: battle.lobbyId,
         startedAt: battle.startedAt ?? new Date(),
         winnerId: battle.winnerId ?? null,
+        nextToActPlayerId: battle.nextToActPlayerId ?? null,
       };
       let doc;
       if (battle.id) {

@@ -7,6 +7,8 @@ import { PokeAPIAdapter } from './infrastructure/clients/pokeapi.adapter.js';
 import { JoinLobbyUseCase } from './application/use-cases/join-lobby.use-case.js';
 import { AssignTeamUseCase } from './application/use-cases/assign-team.use-case.js';
 import { MarkReadyUseCase } from './application/use-cases/mark-ready.use-case.js';
+import { StartBattleUseCase } from './application/use-cases/start-battle.use-case.js';
+import { ProcessAttackUseCase } from './application/use-cases/process-attack.use-case.js';
 import { SocketIOAdapter } from './infrastructure/socket/socketio.adapter.js';
 import { SocketHandler } from './infrastructure/socket/socket.handler.js';
 import { PlayerMongoRepository } from './infrastructure/persistence/mongodb/adapters/player.mongo.repository.js';
@@ -54,10 +56,28 @@ async function start() {
       repositories.teamRepository
     );
     const realtimePort = new SocketIOAdapter(io);
+    const startBattleUseCase = new StartBattleUseCase(
+      repositories.lobbyRepository,
+      repositories.teamRepository,
+      repositories.battleRepository,
+      repositories.pokemonStateRepository,
+      catalogPort,
+      realtimePort
+    );
+    const processAttackUseCase = new ProcessAttackUseCase(
+      repositories.lobbyRepository,
+      repositories.teamRepository,
+      repositories.battleRepository,
+      repositories.pokemonStateRepository,
+      catalogPort,
+      realtimePort
+    );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
+      startBattleUseCase,
+      processAttackUseCase,
       realtimePort,
       repositories.lobbyRepository
     );

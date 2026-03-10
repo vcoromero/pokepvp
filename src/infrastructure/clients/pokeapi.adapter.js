@@ -28,6 +28,11 @@ export const PokeAPIAdapter = {
                 response.status
             );
         }
-        return response.json();
+        const body = await response.json();
+        // API returns { success: true, data: { id, name, hp, attack, ... } }; unwrap for use cases
+        if (body && body.success === true && body.data != null) {
+            return body.data;
+        }
+        return body;
     },
 };

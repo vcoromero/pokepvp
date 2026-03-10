@@ -1,7 +1,8 @@
 services:
   mongo:
-    image: mongo:latest
+    image: mongo:7
     container_name: pokepvp-mongo
+    restart: unless-stopped
     ports:
       - "${MONGO_HOST_PORT:-27017}:27017"
     volumes:

@@ -7,6 +7,8 @@ import { PokeAPIAdapter } from '../infrastructure/clients/pokeapi.adapter.js';
 import { JoinLobbyUseCase } from '../application/use-cases/join-lobby.use-case.js';
 import { AssignTeamUseCase } from '../application/use-cases/assign-team.use-case.js';
 import { MarkReadyUseCase } from '../application/use-cases/mark-ready.use-case.js';
+import { StartBattleUseCase } from '../application/use-cases/start-battle.use-case.js';
+import { ProcessAttackUseCase } from '../application/use-cases/process-attack.use-case.js';
 import { SocketIOAdapter } from '../infrastructure/socket/socketio.adapter.js';
 import { SocketHandler } from '../infrastructure/socket/socket.handler.js';
 
@@ -15,6 +17,8 @@ describe('Socket.IO integration', () => {
   let mockLobbyRepository;
   let mockPlayerRepository;
   let mockTeamRepository;
+  let mockBattleRepository;
+  let mockPokemonStateRepository;
   let mockCatalogPort;
 
   beforeEach(() => {
@@ -22,7 +26,7 @@ describe('Socket.IO integration', () => {
       getList: jest.fn().mockResolvedValue([
         { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 },
       ]),
-      getById: jest.fn().mockResolvedValue({ id: 1, name: 'bulbasaur' }),
+      getById: jest.fn().mockResolvedValue({ id: 1, name: 'bulbasaur', hp: 40, attack: 50, defense: 40, speed: 50 }),
     };
     mockLobbyRepository = {
       findActive: jest.fn(),
@@ -37,6 +41,15 @@ describe('Socket.IO integration', () => {
       findByLobby: jest.fn(),
       findByLobbyAndPlayer: jest.fn(),
     };
+    mockBattleRepository = {
+      findByLobbyId: jest.fn(),
+      save: jest.fn(),
+    };
+    mockPokemonStateRepository = {
+      findByBattleId: jest.fn(),
+      save: jest.fn(),
+      saveMany: jest.fn().mockResolvedValue([]),
+    };
 
     const app = createApp({
       catalogPort: mockCatalogPort,
@@ -44,8 +57,8 @@ describe('Socket.IO integration', () => {
         lobbyRepository: mockLobbyRepository,
         playerRepository: mockPlayerRepository,
         teamRepository: mockTeamRepository,
-        battleRepository: {},
-        pokemonStateRepository: {},
+        battleRepository: mockBattleRepository,
+        pokemonStateRepository: mockPokemonStateRepository,
       },
     });
 
@@ -63,10 +76,28 @@ describe('Socket.IO integration', () => {
     );
     const markReadyUseCase = new MarkReadyUseCase(mockLobbyRepository, mockTeamRepository);
     const realtimePort = new SocketIOAdapter(io);
+    const startBattleUseCase = new StartBattleUseCase(
+      mockLobbyRepository,
+      mockTeamRepository,
+      mockBattleRepository,
+      mockPokemonStateRepository,
+      mockCatalogPort,
+      realtimePort
+    );
+    const processAttackUseCase = new ProcessAttackUseCase(
+      mockLobbyRepository,
+      mockTeamRepository,
+      mockBattleRepository,
+      mockPokemonStateRepository,
+      mockCatalogPort,
+      realtimePort
+    );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
+      startBattleUseCase,
+      processAttackUseCase,
       realtimePort,
       mockLobbyRepository
     );
@@ -205,12 +236,14 @@ describe('Socket.IO integration', () => {
     socket2.disconnect();
   });
 
-  it('attack emits error event with attack_not_available', async () => {
+  it('attack emits error when battle not found', async () => {
     mockLobbyRepository.findActive.mockResolvedValue(null);
     mockLobbyRepository.save
       .mockResolvedValueOnce({ id: 'l1', status: 'waiting', playerIds: [], readyPlayerIds: [] })
       .mockResolvedValue({ id: 'l1', status: 'waiting', playerIds: ['p1'], readyPlayerIds: [] });
+    mockLobbyRepository.findById.mockResolvedValue({ id: 'l1', status: 'battling', playerIds: ['p1', 'p2'] });
     mockPlayerRepository.save.mockResolvedValue({ id: 'p1', nickname: 'Ash', lobbyId: 'l1' });
+    mockBattleRepository.findByLobbyId.mockResolvedValue(null);
 
     const port = await listen(0);
     const socket = await connect(port);
@@ -224,17 +257,17 @@ describe('Socket.IO integration', () => {
     });
 
     const ackReceived = new Promise((resolve) => {
-      socket.emit('attack', { lobbyId: 'l1', playerId: 'p1' }, resolve);
+      socket.emit('attack', { lobbyId: 'l1' }, resolve);
     });
 
     const [errorPayload, ackResponse] = await Promise.all([errorReceived, ackReceived]);
 
     expect(errorPayload).toEqual({
-      code: 'attack_not_available',
-      message: 'Attack not implemented yet (Stage 6)',
+      code: 'NotFoundError',
+      message: 'Battle not found',
     });
     expect(ackResponse).toEqual({
-      error: { code: 'attack_not_available', message: 'Attack not implemented yet (Stage 6)' },
+      error: { code: 'NotFoundError', message: 'Battle not found' },
     });
 
     socket.disconnect();
