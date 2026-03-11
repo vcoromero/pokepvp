@@ -1,5 +1,6 @@
-import { ValidationError } from '../errors/Validation.error.js';
 import { ConflictError } from '../errors/Conflict.error.js';
+import { Nickname } from '../../domain/value-objects/nickname.js';
+import { Lobby } from '../../domain/entities/lobby.entity.js';
 
 export class JoinLobbyUseCase {
   constructor(playerRepository, lobbyRepository) {
@@ -8,54 +9,37 @@ export class JoinLobbyUseCase {
   }
 
   async execute({ nickname }) {
-    const trimmedNickname = this.validateNickname(nickname);
-    const activeLobby = await this.lobbyRepository.findActive();
+    const validNickname = new Nickname(nickname);
+    const activePlain = await this.lobbyRepository.findActive();
 
-    if (!activeLobby) {
-      return this.createLobbyAndJoin(trimmedNickname);
+    if (!activePlain) {
+      return this.createLobbyAndJoin(validNickname.value);
     }
 
-    if (activeLobby.status !== 'waiting') {
-      throw new ConflictError('Cannot join lobby that is not waiting');
+    const lobby = Lobby.from(activePlain);
+
+    if (!lobby.canJoin()) {
+      throw new ConflictError(
+        lobby.isFull() ? 'Lobby is full' : 'Cannot join lobby that is not waiting'
+      );
     }
 
-    if ((activeLobby.playerIds ?? []).length >= 2) {
-      throw new ConflictError('Lobby is full');
-    }
-
-    return this.joinExistingLobby(activeLobby, trimmedNickname);
-  }
-
-  validateNickname(nickname) {
-    if (nickname == null || typeof nickname !== 'string') {
-      throw new ValidationError('nickname is required and must be a string');
-    }
-
-    const trimmed = nickname.trim();
-    if (trimmed.length === 0) {
-      throw new ValidationError('nickname cannot be empty');
-    }
-
-    return trimmed;
+    return this.joinExistingLobby(lobby, validNickname.value);
   }
 
   async createLobbyAndJoin(nickname) {
-    const initialLobby = await this.lobbyRepository.save({
-      status: 'waiting',
-      playerIds: [],
-      readyPlayerIds: [],
-    });
+    const initialLobby = await this.lobbyRepository.save(
+      new Lobby().toPlain()
+    );
 
     const player = await this.playerRepository.save({
       nickname,
       lobbyId: initialLobby.id,
     });
 
-    const lobby = await this.lobbyRepository.save({
-      ...initialLobby,
-      playerIds: [player.id],
-      readyPlayerIds: [],
-    });
+    const lobby = await this.lobbyRepository.save(
+      Lobby.from(initialLobby).addPlayer(player.id).toPlain()
+    );
 
     return { player, lobby };
   }
@@ -66,11 +50,9 @@ export class JoinLobbyUseCase {
       lobbyId: lobby.id,
     });
 
-    const updatedLobby = await this.lobbyRepository.save({
-      ...lobby,
-      playerIds: [...(lobby.playerIds ?? []), player.id],
-      readyPlayerIds: lobby.readyPlayerIds ?? [],
-    });
+    const updatedLobby = await this.lobbyRepository.save(
+      lobby.addPlayer(player.id).toPlain()
+    );
 
     return { player, lobby: updatedLobby };
   }

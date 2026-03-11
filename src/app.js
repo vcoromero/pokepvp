@@ -24,7 +24,11 @@ export function createApp() {
   });
 
   app.use((err, req, res, next) => {
-    console.error(err);
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[${err.name}] ${err.message}`);
+    } else {
+      console.error(err);
+    }
     const status = err.status ?? 500;
     res.status(status).json({ error: err.message || 'Internal server error' });
   });

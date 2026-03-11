@@ -1,6 +1,7 @@
 import { ValidationError } from '../errors/Validation.error.js';
 import { NotFoundError } from '../errors/NotFound.error.js';
 import { ConflictError } from '../errors/Conflict.error.js';
+import { Lobby } from '../../domain/entities/lobby.entity.js';
 
 function buildUniqueCatalogIds(catalogList) {
   const ids = [];
@@ -52,14 +53,14 @@ export class AssignTeamUseCase {
       throw new ValidationError('lobbyId and playerId are required');
     }
 
-    const lobby = await this.lobbyRepository.findById(lobbyId);
+    const lobby = Lobby.from(await this.lobbyRepository.findById(lobbyId));
     if (!lobby) {
       throw new NotFoundError('Lobby not found');
     }
-    if (lobby.status !== 'waiting') {
+    if (!lobby.canAssignTeams()) {
       throw new ConflictError('Teams can only be assigned when lobby is waiting');
     }
-    if (!(lobby.playerIds ?? []).includes(playerId)) {
+    if (!lobby.hasPlayer(playerId)) {
       throw new NotFoundError('Player is not in this lobby');
     }
 
@@ -79,6 +80,6 @@ export class AssignTeamUseCase {
 
     const pokemonIds = pickRandomDistinct(availableCatalogIds, 3, this.randomFn);
     const team = await this.teamRepository.save({ lobbyId, playerId, pokemonIds });
-    return { team, lobby };
+    return { team, lobby: lobby.toPlain() };
   }
 }

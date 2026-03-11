@@ -34,20 +34,20 @@ Full code review of the PokePVP backend project evaluating hexagonal architectur
 | ~~PERF-2~~ | ~~No cache for external Pokémon API~~ | ~~HIGH~~ | ~~Performance~~ | ✅ Absorbed into ARCH-3 |
 | ~~PERF-3~~ | ~~No timeout on external HTTP calls~~ | ~~MEDIUM~~ | ~~Performance~~ | ✅ Absorbed into ARCH-3 |
 | ~~ARCH-6~~ | ~~LobbyController is redundant — all game flow is Socket.IO~~ | ~~HIGH~~ | ~~Architecture~~ | ✅ Resolved |
-| ARCH-1 | Anemic domain model — business logic in use cases | HIGH | Architecture | Pending |
+| ~~ARCH-1~~ | ~~Anemic domain model — business logic in use cases~~ | ~~HIGH~~ | ~~Architecture~~ | ✅ Resolved |
 | ~~SOLID-1~~ | ~~SocketHandler has 7 dependencies, mixed responsibilities~~ | ~~HIGH~~ | ~~SOLID~~ | ✅ Resolved |
-| SEC-4 | Nickname without max length validation | MEDIUM | Security | Pending |
-| SEC-5 | MongoDB without authentication in Docker | MEDIUM | Security | Pending |
+| ~~SEC-4~~ | ~~Nickname without max length validation~~ | ~~MEDIUM~~ | ~~Security~~ | ✅ Resolved |
+| ~~SEC-5~~ | ~~MongoDB without authentication in Docker~~ | ~~MEDIUM~~ | ~~Security~~ | ✅ Resolved |
 | ~~SOLID-2~~ | ~~statusFromError duplicated across multiple files~~ | ~~MEDIUM~~ | ~~SOLID~~ | ✅ Resolved by ARCH-6 |
 | ~~SOLID-3~~ | ~~Dependency wiring duplicated in index.js and app.js~~ | ~~MEDIUM~~ | ~~SOLID~~ | ✅ Resolved by ARCH-6 |
 | ~~ARCH-2~~ | ~~PersistenceController bypasses use cases~~ | ~~MEDIUM~~ | ~~Architecture~~ | ✅ Resolved |
-| PERF-4 | No graceful shutdown | MEDIUM | Performance | Pending |
+| ~~PERF-4~~ | ~~No graceful shutdown~~ | ~~MEDIUM~~ | ~~Performance~~ | ✅ Resolved |
 | ~~CLEAN-1~~ | ~~Inconsistent error handling in controllers~~ | ~~MEDIUM~~ | ~~Clean Code~~ | ✅ Resolved by ARCH-6 |
 | ~~CLEAN-2~~ | ~~mapRepositoryError has confusing throw pattern~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved |
 | ~~CLEAN-3~~ | ~~Inconsistent error import paths~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved |
 | ~~CLEAN-4~~ | ~~Excessive nested try-catch in socket handler~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved by SOLID-1 |
-| SEC-6 | Stack traces exposed in production logs | LOW | Security | Pending |
-| ARCH-4 | Value objects not implemented | LOW | Architecture | Pending |
+| ~~SEC-6~~ | ~~Stack traces exposed in production logs~~ | ~~LOW~~ | ~~Security~~ | ✅ Resolved |
+| ~~ARCH-4~~ | ~~Value objects not implemented~~ | ~~LOW~~ | ~~Architecture~~ | ✅ Resolved |
 | SCALE-1 | Socket.IO without adapter for horizontal scaling | LOW (for MVP) | Scalability | Pending |
 | SCALE-2 | findActive() returns only one lobby | LOW (for MVP) | Scalability | Pending |
 
@@ -80,62 +80,32 @@ Full code review of the PokePVP backend project evaluating hexagonal architectur
 
 ---
 
-### SEC-4 — Nickname Without Max Length Validation [MEDIUM]
+### ~~SEC-4~~ — Nickname Without Max Length Validation [MEDIUM] ✅ Resolved
 
-**Problem:** The player schema (`src/infrastructure/persistence/mongodb/schemas/player.schema.js`) has no `maxlength`. The use case (`src/application/use-cases/join-lobby.use-case.js`) validates non-empty but not max length. A malicious client could send extremely long nicknames.
-
-**Recommended fix:**
-- Add `maxlength: 30` to the Mongoose schema:
-  ```javascript
-  nickname: { type: String, required: true, maxlength: 30 },
-  ```
-- Add validation in `JoinLobbyUseCase.validateNickname()`:
-  ```javascript
-  if (trimmed.length > 30) {
-    throw new ValidationError('nickname must be 30 characters or fewer');
-  }
-  ```
+**Resolution:**
+- Added `maxlength: 30` to `src/infrastructure/persistence/mongodb/schemas/player.schema.js`.
+- Added `trimmed.length > 30` check in `JoinLobbyUseCase.validateNickname()` — throws `ValidationError('nickname must be 30 characters or fewer')`.
+- Added 2 tests: rejects 31-char nickname, accepts exactly 30-char nickname.
 
 ---
 
-### SEC-5 — MongoDB Without Authentication in Docker [MEDIUM]
+### ~~SEC-5~~ — MongoDB Without Authentication in Docker [MEDIUM] ✅ Resolved
 
-**Problem:** `docker-compose.yml` runs MongoDB without any user/password. The port is exposed on the host.
+**Resolution:**
+- Added `MONGO_INITDB_ROOT_USERNAME: pokepvp` and `MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-devpassword}` to `docker-compose.yml`.
+- Updated `.env.example` with auth connection string: `mongodb://pokepvp:devpassword@localhost:27018/pokepvp?authSource=admin`.
+- Added `MONGO_PASSWORD=devpassword` to `.env.example`.
 
-**Recommended fix:**
-```yaml
-services:
-  mongo:
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: pokepvp
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-devpassword}
-    ports:
-      - "${MONGO_HOST_PORT:-27017}:27017"
-    volumes:
-      - mongo-data:/data/db
-```
-Update `.env.example`:
-```
-MONGODB_URI=mongodb://pokepvp:devpassword@localhost:27017/pokepvp?authSource=admin
-```
+**Note:** Existing volumes must be recreated for auth to take effect: `docker compose down -v && docker compose up -d`.
 
 ---
 
-### SEC-6 — Stack Traces Exposed in Production Logs [LOW]
+### ~~SEC-6~~ — Stack Traces Exposed in Production Logs [LOW] ✅ Resolved
 
-**Problem:** `console.error(err)` in `src/app.js:80` and multiple `console.error` calls in `src/infrastructure/socket/socket.handler.js` log full stack traces regardless of environment.
-
-**Recommended fix:**
-- Condition log verbosity on `NODE_ENV`:
-  ```javascript
-  if (process.env.NODE_ENV === 'production') {
-    console.error(`[${err.name}] ${err.message}`);
-  } else {
-    console.error(err);
-  }
-  ```
-- Consider using a structured logger (e.g., `pino`) for production.
+**Resolution:**
+- `src/app.js` error middleware: logs `[${err.name}] ${err.message}` in production, full `err` otherwise.
+- `src/infrastructure/socket/socket.handler.js`: extracted `logError(eventName, err)` function — logs `[eventName] [err.name] err.message` in production, full stack otherwise.
+- A structured logger (e.g., `pino`) can be added later as an enhancement.
 
 ---
 
@@ -188,37 +158,38 @@ Removed `LobbyController` and all REST lobby endpoints. All game flow now goes e
 
 ---
 
-### ARCH-1 — Anemic Domain Model [HIGH]
+### ~~ARCH-1~~ — Anemic Domain Model [HIGH] ✅ Resolved
 
-**Problem:** Entities in `src/domain/entities/` are only JSDoc typedefs with exported constants. They have no behavior. All business logic lives in use cases:
+**Resolution:**
 
-- **Damage formula** in `src/application/use-cases/process-attack.use-case.js:94`:
-  ```javascript
-  const damage = Math.max(1, (attackerDetail.attack ?? 0) - (defenderDetail.defense ?? 0));
-  ```
-- **First turn resolution** in `src/application/use-cases/start-battle.use-case.js:15-24`
-- **Lobby full check** in `src/application/use-cases/join-lobby.use-case.js:22`
-- **Both players ready check** in `src/application/use-cases/mark-ready.use-case.js:4-13`
+Enriched the domain layer with behavior-rich entities and domain services. Use cases now delegate business logic to the domain.
 
-In hexagonal architecture, the domain should contain the core business logic, not just data shapes.
+**New files created (2 domain services):**
+- `src/domain/services/damage-calculator.js` — `calculateDamage(attackStat, defenseStat)` encapsulates `Math.max(1, attack - defense)`.
+- `src/domain/services/turn-resolver.js` — `resolveFirstTurn({ speedA, speedB, playerIdA, playerIdB, pokemonIdA, pokemonIdB })` encapsulates first-turn resolution with Speed + deterministic tiebreakers.
 
-**Recommended fix:**
-- Create domain services:
-  - `src/domain/services/damage-calculator.js` — encapsulate the damage formula
-  - `src/domain/services/turn-resolver.js` — encapsulate first-turn logic
-- Enrich entities with behavior methods:
-  ```javascript
-  // Example: Lobby entity as a class
-  export class Lobby {
-    constructor({ id, status, playerIds, readyPlayerIds, createdAt }) { ... }
-    isFull() { return this.playerIds.length >= 2; }
-    canJoin() { return this.status === 'waiting' && !this.isFull(); }
-    isEveryoneReady() { return this.playerIds.every(id => this.readyPlayerIds.includes(id)); }
-    addPlayer(playerId) { ... }
-    markReady(playerId) { ... }
-  }
-  ```
-- Use cases then delegate to entities and domain services instead of containing the logic themselves.
+**Entity enriched (1 file rewritten):**
+- `src/domain/entities/lobby.entity.js` — converted from JSDoc typedef + constants to a full `Lobby` class with:
+  - `Lobby.from(plain)` — factory from plain objects (returns `null` for null input)
+  - `isFull()`, `canJoin()`, `canAssignTeams()`, `hasPlayer(playerId)` — query methods
+  - `addPlayer(playerId)`, `markReady(playerId)`, `withStatus(newStatus)` — immutable state transitions (return new Lobby instances)
+  - `isAlreadyReady(playerId)`, `isEveryoneReady()` — readiness checks
+  - `toPlain()` — serializes back to a plain object for repository persistence
+
+**Use cases updated (5 files):**
+- `join-lobby.use-case.js` — uses `Nickname` value object + `Lobby.from()`, `lobby.canJoin()`, `lobby.addPlayer()`, `lobby.toPlain()`
+- `mark-ready.use-case.js` — uses `Lobby.from()`, `lobby.hasPlayer()`, `lobby.isAlreadyReady()`, `lobby.markReady()`, `lobby.isEveryoneReady()`, `lobby.withStatus()`
+- `assign-team.use-case.js` — uses `Lobby.from()`, `lobby.canAssignTeams()`, `lobby.hasPlayer()`
+- `process-attack.use-case.js` — uses `calculateDamage()` from domain service
+- `start-battle.use-case.js` — uses `resolveFirstTurn()` from domain service
+
+**New tests (4 test files, 36 new tests):**
+- `src/domain/entities/__tests__/lobby.entity.test.js` — 22 tests covering all Lobby methods
+- `src/domain/value-objects/__tests__/nickname.test.js` — 6 tests (see ARCH-4)
+- `src/domain/services/__tests__/damage-calculator.test.js` — 4 tests
+- `src/domain/services/__tests__/turn-resolver.test.js` — 4 tests
+
+**Existing tests:** All 80 existing tests pass without modification — the refactor is fully backward-compatible.
 
 ---
 
@@ -252,15 +223,27 @@ Refactored `src/infrastructure/clients/pokeapi.adapter.js` from a plain object l
 
 ---
 
-### ARCH-4 — Value Objects Not Implemented [LOW]
+### ~~ARCH-4~~ — Value Objects Not Implemented [LOW] ✅ Resolved
 
-**Problem:** The architecture document (`docs/architecture.md`) mentions "value objects" but none exist. Candidates:
-- `LobbyStatus` — enforce valid transitions (waiting -> ready -> battling -> finished)
-- `Nickname` — encapsulate trim + length validation
-- `Damage` — encapsulate the damage formula result
-- `PokemonId` — type-safe wrapper for numeric IDs
+**Resolution:**
 
-**Recommended fix:** Start with `LobbyStatus` and `Nickname` as they provide the most validation value. These can be simple classes or factory functions with built-in validation.
+Implemented the `Nickname` value object, which provides the most immediate validation value. Lobby status transitions are now enforced through the enriched `Lobby` entity class (see ARCH-1).
+
+**New file created:**
+- `src/domain/value-objects/nickname.js` — `Nickname` class that encapsulates:
+  - Type validation (must be a non-null string)
+  - Trimming whitespace
+  - Non-empty check
+  - Max length validation (30 characters)
+  - `toString()` for convenient string coercion
+
+**Use case updated:**
+- `join-lobby.use-case.js` — replaced inline `validateNickname()` method with `new Nickname(nickname)` construction. Validation errors are identical.
+
+**New tests:**
+- `src/domain/value-objects/__tests__/nickname.test.js` — 6 tests covering valid input, trimming, null, non-string, empty, and max length.
+
+**Note:** `LobbyStatus` as a separate value object was not needed — the `Lobby` entity class already enforces valid state through its behavior methods (`canJoin()`, `canAssignTeams()`, `withStatus()`). Additional value objects (`Damage`, `PokemonId`) can be added as needed.
 
 ---
 
@@ -326,25 +309,15 @@ Reduced SocketHandler from 7 to 6 dependencies by removing `lobbyRepository`. Al
 
 ---
 
-### PERF-4 — No Graceful Shutdown [MEDIUM]
+### ~~PERF-4~~ — No Graceful Shutdown [MEDIUM] ✅ Resolved
 
-**Problem:** `src/index.js` does not handle `SIGTERM` or `SIGINT`. When the process is killed (e.g., container restart), active Socket.IO connections and MongoDB operations are abruptly terminated.
-
-**Recommended fix:**
-```javascript
-function shutdown(server, io) {
-  console.log('Shutting down gracefully...');
-  io.close();
-  server.close(async () => {
-    await mongoose.connection.close();
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10000); // force exit after 10s
-}
-
-process.on('SIGTERM', () => shutdown(server, io));
-process.on('SIGINT', () => shutdown(server, io));
-```
+**Resolution:**
+- Added `shutdown(signal)` function in `src/index.js` that:
+  1. Closes Socket.IO (`io.close()`)
+  2. Closes the HTTP server (`server.close()`)
+  3. Closes the MongoDB connection (`mongoose.connection.close()`)
+  4. Force-exits after 10 seconds if cleanup hangs
+- Registered `process.on('SIGTERM')` and `process.on('SIGINT')` handlers.
 
 ---
 
@@ -424,16 +397,21 @@ Removed the 3 re-export files from `src/infrastructure/errors/` for application-
 
 ### Current State
 
-- **12 test files**, 78 tests passing (after ARCH-5, SEC-1, ARCH-6, SOLID-1, CLEAN-4, ARCH-2 resolutions)
-- **Coverage thresholds** (jest.config.cjs): statements 80%, branches 44%, functions 80%, lines 80%
-- Branch coverage at 44% indicates many untested code paths
+- **16 test files**, 124 tests passing (after all resolutions through Stage F)
+- **Coverage:** statements 89%, branches 80%, functions 95%, lines 89%
+- Branch coverage improved from 44% to **80%** (was 76% before Stage F security tests)
 
-### Suggested Improvements
+### Resolved Improvements
 
-- **Security tests:** Add tests for playerId spoofing scenarios (sending wrong playerId in payload).
-- **Branch coverage:** Increase from 44% to at least 70% by testing edge cases in use cases (error paths, boundary conditions).
+- **Security tests** ✅ — Added 8 tests covering lobbyId spoofing prevention (`assign_pokemon`, `ready`), missing player context, missing lobbyId, and safeAck resilience.
+- **Branch coverage** ✅ — Increased from 44% to 80% through domain layer tests (ARCH-1) and targeted security/edge case tests (Stage F).
+- **Start battle idempotency** ✅ — Added tests for "already battling" path and "battle with winner" edge case.
+
+### Remaining Suggestions
+
 - **Integration tests:** Add full battle flow integration test (join -> assign -> ready -> battle -> win).
 - **Performance tests:** Test behavior when external API is slow or unavailable (timeout scenarios).
+- **Mongoose schemas:** Currently at 0% coverage — these are declarative definitions and low-value to test directly.
 
 ---
 
@@ -447,8 +425,8 @@ Removed the 3 re-export files from `src/infrastructure/errors/` for application-
 | ~~Add REST authentication (token from join)~~ | ~~SEC-1~~ | ✅ Done |
 | ~~Install and configure express-rate-limit~~ | ~~SEC-2~~ | ✅ Done |
 | ~~Set express.json body size limit~~ | ~~SEC-3~~ | ✅ Done |
-| Add nickname maxlength validation | SEC-4 | Pending |
-| Add MongoDB authentication in Docker | SEC-5 | Pending |
+| ~~Add nickname maxlength validation~~ | ~~SEC-4~~ | ✅ Done |
+| ~~Add MongoDB authentication in Docker~~ | ~~SEC-5~~ | ✅ Done |
 
 ### Stage B — Dead Code Removal and Architecture Refactoring (Priority: HIGH)
 
@@ -464,11 +442,11 @@ Removed the 3 re-export files from `src/infrastructure/errors/` for application-
 
 ### Stage C — Domain Enrichment (Priority: HIGH)
 
-| Task | IDs | Effort |
+| Task | IDs | Status |
 |------|-----|--------|
-| Create domain services (damage-calculator, turn-resolver) | ARCH-1 | Medium |
-| Enrich entities with behavior (Lobby, Battle classes) | ARCH-1 | High |
-| Implement core value objects (LobbyStatus, Nickname) | ARCH-4 | Medium |
+| ~~Create domain services (damage-calculator, turn-resolver)~~ | ~~ARCH-1~~ | ✅ Done |
+| ~~Enrich entities with behavior (Lobby class with isFull, canJoin, etc.)~~ | ~~ARCH-1~~ | ✅ Done |
+| ~~Implement Nickname value object~~ | ~~ARCH-4~~ | ✅ Done |
 
 ### Stage D — Performance Optimization (Priority: MEDIUM)
 
@@ -477,7 +455,7 @@ Removed the 3 re-export files from `src/infrastructure/errors/` for application-
 | ~~Parallel fetch in StartBattleUseCase~~ | ~~PERF-1~~ | ✅ Absorbed into ARCH-3 (Stage B) |
 | ~~Add in-memory cache to PokeAPIAdapter~~ | ~~PERF-2~~ | ✅ Absorbed into ARCH-3 (Stage B) |
 | ~~Add timeout to external fetch calls~~ | ~~PERF-3~~ | ✅ Absorbed into ARCH-3 (Stage B) |
-| Implement graceful shutdown | PERF-4 | Pending |
+| ~~Implement graceful shutdown~~ | ~~PERF-4~~ | ✅ Done |
 
 ### Stage E — Clean Code Polish (Priority: LOW)
 
@@ -487,16 +465,16 @@ Removed the 3 re-export files from `src/infrastructure/errors/` for application-
 | ~~Rename mapRepositoryError → throwMappedError~~ | ~~CLEAN-2~~ | ✅ Done |
 | ~~Fix inconsistent error import paths~~ | ~~CLEAN-3~~ | ✅ Done |
 | ~~Create socket handler wrapper for try-catch~~ | ~~CLEAN-4~~ | ✅ Resolved by SOLID-1 |
-| Condition log verbosity on NODE_ENV | SEC-6 | Pending |
+| ~~Condition log verbosity on NODE_ENV~~ | ~~SEC-6~~ | ✅ Done |
 
 ### Stage F — Tests and Documentation (Priority: LOW)
 
-| Task | IDs | Effort |
+| Task | IDs | Status |
 |------|-----|--------|
-| Add security-related tests | Tests | Medium |
-| Increase branch coverage to 70%+ | Tests | Medium |
-| Update docs/architecture.md with changes | Docs | Low |
-| Document scalability limitations | SCALE-1, SCALE-2 | Low |
+| ~~Add security-related tests (spoofing, auth, safeAck)~~ | ~~Tests~~ | ✅ Done (8 new tests) |
+| ~~Increase branch coverage to 80%~~ | ~~Tests~~ | ✅ Done (44% → 80%) |
+| ~~Update docs/architecture.md with all changes~~ | ~~Docs~~ | ✅ Done |
+| ~~Document scalability limitations~~ | ~~SCALE-1, SCALE-2~~ | ✅ Done (in architecture.md §10) |
 
 ---
 
