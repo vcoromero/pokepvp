@@ -139,7 +139,7 @@ describe('ProcessAttackUseCase', () => {
 
     expect(result.defender.defeated).toBe(true);
     expect(result.defender.currentHp).toBe(0);
-    expect(result.nextActivePokemon).toEqual({ playerId: 'p2', pokemonId: 5 });
+    expect(result.nextActivePokemon).toEqual({ playerId: 'p2', pokemonId: 5, name: '', sprite: '' });
     expect(result.battleFinished).toBe(false);
     expect(realtimePort.notifyBattleEnd).not.toHaveBeenCalled();
   });

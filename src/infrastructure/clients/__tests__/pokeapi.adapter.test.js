@@ -37,7 +37,16 @@ describe('PokeAPIAdapter', () => {
       ok: true,
       json: jest.fn().mockResolvedValue({
         success: true,
-        data: { id: '25', name: 'pikachu', hp: '35', attack: '55', defense: '40', speed: '90' },
+        data: {
+          id: '25',
+          name: 'pikachu',
+          hp: '35',
+          attack: '55',
+          defense: '40',
+          speed: '90',
+          sprite: 'https://example.com/pikachu.gif',
+          type: ['Electric'],
+        },
       }),
     });
 
@@ -52,9 +61,62 @@ describe('PokeAPIAdapter', () => {
       attack: 55,
       defense: 40,
       speed: 90,
+      sprite: 'https://example.com/pikachu.gif',
+      type: ['Electric'],
     });
     expect(second).toEqual(first);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps real API detail response (success + data with type array and sprite URL)', async () => {
+    const apiResponse = {
+      success: true,
+      data: {
+        id: 1,
+        name: 'Bulbasaur',
+        type: ['Grass', 'Poison'],
+        hp: 45,
+        attack: 49,
+        defense: 49,
+        speed: 45,
+        sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/1.gif',
+      },
+    };
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue(apiResponse),
+    });
+
+    const adapter = new PokeAPIAdapter('https://poke.test');
+    const detail = await adapter.getById(1);
+
+    expect(detail).toEqual({
+      id: 1,
+      name: 'Bulbasaur',
+      hp: 45,
+      attack: 49,
+      defense: 49,
+      speed: 45,
+      sprite: apiResponse.data.sprite,
+      type: ['Grass', 'Poison'],
+    });
+  });
+
+  it('maps detail with missing sprite and type to empty string and array', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        success: true,
+        data: { id: '7', name: 'squirtle', hp: '44', attack: '48', defense: '65', speed: '43' },
+      }),
+    });
+
+    const adapter = new PokeAPIAdapter('https://poke.test');
+    const detail = await adapter.getById(7);
+
+    expect(detail.sprite).toBe('');
+    expect(detail.type).toEqual([]);
+    expect(detail.name).toBe('squirtle');
   });
 
   it('throws ThirdPartyApiFailedError on timeout', async () => {

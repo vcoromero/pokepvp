@@ -79,7 +79,21 @@ export class AssignTeamUseCase {
     }
 
     const pokemonIds = pickRandomDistinct(availableCatalogIds, 3, this.randomFn);
-    const team = await this.teamRepository.save({ lobbyId, playerId, pokemonIds });
+    const details = await Promise.all(
+      pokemonIds.map((id) => this.catalogPort.getById(id))
+    );
+    const pokemonDetails = details.map((d, i) => ({
+      pokemonId: pokemonIds[i],
+      name: d?.name ?? '',
+      sprite: d?.sprite ?? '',
+      type: Array.isArray(d?.type) ? d.type : [],
+    }));
+    const team = await this.teamRepository.save({
+      lobbyId,
+      playerId,
+      pokemonIds,
+      pokemonDetails,
+    });
     return { team, lobby: lobby.toPlain() };
   }
 }

@@ -20,9 +20,12 @@ describe('StartBattleUseCase', () => {
     readyPlayerIds: ['p1', 'p2'],
   };
 
+  const pokemonDetailsFor = (ids) =>
+    ids.map((pokemonId) => ({ pokemonId, name: `Poke${pokemonId}`, sprite: `https://ex.io/${pokemonId}.gif`, type: ['Normal'] }));
+
   const twoTeams = [
-    { id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3] },
-    { id: 't2', lobbyId: 'l1', playerId: 'p2', pokemonIds: [4, 5, 6] },
+    { id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3], pokemonDetails: pokemonDetailsFor([1, 2, 3]) },
+    { id: 't2', lobbyId: 'l1', playerId: 'p2', pokemonIds: [4, 5, 6], pokemonDetails: pokemonDetailsFor([4, 5, 6]) },
   ];
 
   beforeEach(() => {
@@ -89,7 +92,7 @@ describe('StartBattleUseCase', () => {
 
   it('throws ValidationError when a team does not have exactly 3 Pokémon', async () => {
     teamRepository.findByLobby.mockResolvedValue([
-      { ...twoTeams[0], pokemonIds: [1, 2] },
+      { ...twoTeams[0], pokemonIds: [1, 2], pokemonDetails: pokemonDetailsFor([1, 2]) },
       twoTeams[1],
     ]);
 
