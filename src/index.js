@@ -78,8 +78,7 @@ async function start() {
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
-      realtimePort,
-      repositories.lobbyRepository
+      realtimePort
     );
     socketHandler.attach(io);
   }

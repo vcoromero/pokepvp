@@ -51,8 +51,14 @@ describe('AssignTeamUseCase', () => {
       playerId: 'p2',
       pokemonIds: [5, 6, 7],
     });
-    expect(result.pokemonIds).toHaveLength(3);
-    expect(result.pokemonIds.every((id) => ![1, 2, 3].includes(id))).toBe(true);
+    expect(result.team.pokemonIds).toHaveLength(3);
+    expect(result.team.pokemonIds.every((id) => ![1, 2, 3].includes(id))).toBe(true);
+    expect(result.lobby).toEqual({
+      id: 'l1',
+      status: 'waiting',
+      playerIds: ['p1', 'p2'],
+      readyPlayerIds: [],
+    });
   });
 
   it('supports catalog payload wrapped in data property', async () => {
@@ -72,7 +78,7 @@ describe('AssignTeamUseCase', () => {
 
     const result = await useCase.execute({ lobbyId: 'l1', playerId: 'p1' });
 
-    expect(result.pokemonIds).toHaveLength(3);
+    expect(result.team.pokemonIds).toHaveLength(3);
   });
 
   it('throws ValidationError when lobbyId or playerId is missing', async () => {

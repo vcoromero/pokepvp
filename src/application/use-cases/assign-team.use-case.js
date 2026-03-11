@@ -78,6 +78,7 @@ export class AssignTeamUseCase {
     }
 
     const pokemonIds = pickRandomDistinct(availableCatalogIds, 3, this.randomFn);
-    return this.teamRepository.save({ lobbyId, playerId, pokemonIds });
+    const team = await this.teamRepository.save({ lobbyId, playerId, pokemonIds });
+    return { team, lobby };
   }
 }

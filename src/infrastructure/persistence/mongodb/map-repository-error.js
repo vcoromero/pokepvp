@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
-import { ValidationError } from '../../errors/Validation.error.js';
-import { ConflictError } from '../../errors/Conflict.error.js';
+import { ValidationError } from '../../../application/errors/Validation.error.js';
+import { ConflictError } from '../../../application/errors/Conflict.error.js';
 
 /**
  * Maps Mongoose/Mongo errors to domain HTTP-friendly errors.
  * Call in repository catch blocks; rethrows the mapped or original error.
  * @param {Error} err
  */
-export function mapRepositoryError(err) {
+export function throwMappedError(err) {
   if (err instanceof mongoose.Error.ValidationError) {
     throw new ValidationError(err.message);
   }

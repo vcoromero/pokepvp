@@ -35,7 +35,6 @@ describe('SocketHandler', () => {
   let startBattleUseCase;
   let processAttackUseCase;
   let realtimePort;
-  let lobbyRepository;
   let handler;
 
   beforeEach(() => {
@@ -50,15 +49,13 @@ describe('SocketHandler', () => {
       notifyTurnResult: jest.fn(),
       notifyBattleEnd: jest.fn(),
     };
-    lobbyRepository = { findById: jest.fn() };
     handler = new SocketHandler(
       joinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
-      realtimePort,
-      lobbyRepository
+      realtimePort
     );
   });
 
@@ -153,8 +150,8 @@ describe('SocketHandler', () => {
       mockIo._simulateConnection(socket);
 
       const team = { id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3] };
-      assignTeamUseCase.execute.mockResolvedValue(team);
-      lobbyRepository.findById.mockResolvedValue({ id: 'l1', status: 'waiting', playerIds: ['p1', 'p2'] });
+      const lobby = { id: 'l1', status: 'waiting', playerIds: ['p1', 'p2'] };
+      assignTeamUseCase.execute.mockResolvedValue({ team, lobby });
 
       const ack = jest.fn();
       socket._trigger('assign_pokemon', { lobbyId: 'l1' }, ack);
@@ -163,8 +160,7 @@ describe('SocketHandler', () => {
 
       expect(assignTeamUseCase.execute).toHaveBeenCalledWith({ lobbyId: 'l1', playerId: 'p1' });
       expect(socket.join).toHaveBeenCalledWith('lobby:l1');
-      expect(lobbyRepository.findById).toHaveBeenCalledWith('l1');
-      expect(realtimePort.notifyLobbyStatus).toHaveBeenCalledWith('l1', { lobby: { id: 'l1', status: 'waiting', playerIds: ['p1', 'p2'] } });
+      expect(realtimePort.notifyLobbyStatus).toHaveBeenCalledWith('l1', { lobby });
       expect(ack).toHaveBeenCalledWith(team);
     });
 
@@ -177,8 +173,8 @@ describe('SocketHandler', () => {
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
-      assignTeamUseCase.execute.mockResolvedValue({ id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3] });
-      lobbyRepository.findById.mockResolvedValue({ id: 'l1' });
+      const team = { id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3] };
+      assignTeamUseCase.execute.mockResolvedValue({ team, lobby: { id: 'l1' } });
 
       socket._trigger('assign_pokemon', { lobbyId: 'l1' }, jest.fn());
 
@@ -205,6 +201,21 @@ describe('SocketHandler', () => {
 
       expect(socket.emit).toHaveBeenCalledWith('error', { code: 'NotFoundError', message: 'Lobby not found' });
       expect(ack).toHaveBeenCalledWith({ error: { code: 'NotFoundError', message: 'Lobby not found' } });
+    });
+
+    it('emits error when socket has no player context', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('assign_pokemon', {}, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(socket.emit).toHaveBeenCalledWith('error', expect.objectContaining({ code: 'ValidationError' }));
+      expect(ack).toHaveBeenCalledWith({ error: expect.objectContaining({ code: 'ValidationError' }) });
     });
   });
 
@@ -275,7 +286,7 @@ describe('SocketHandler', () => {
   });
 
   describe('handleAttack', () => {
-    it('calls processAttackUseCase and acks with turn result', async () => {
+    it('calls processAttackUseCase with only lobbyId and attackerPlayerId, acks with turn result', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
       socket.data.lobbyId = 'l1';
@@ -283,7 +294,6 @@ describe('SocketHandler', () => {
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
-      lobbyRepository.findById.mockResolvedValue({ id: 'l1', playerIds: ['p1', 'p2'] });
       const turnResult = {
         battleId: 'b1',
         lobbyId: 'l1',
@@ -299,11 +309,9 @@ describe('SocketHandler', () => {
 
       await new Promise((r) => setTimeout(r, 0));
 
-      expect(lobbyRepository.findById).toHaveBeenCalledWith('l1');
       expect(processAttackUseCase.execute).toHaveBeenCalledWith({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       });
       expect(ack).toHaveBeenCalledWith(turnResult);
       expect(socket.emit).not.toHaveBeenCalledWith('error', expect.anything());
@@ -317,7 +325,6 @@ describe('SocketHandler', () => {
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
-      lobbyRepository.findById.mockResolvedValue({ id: 'l1', playerIds: ['p1', 'p2'] });
       processAttackUseCase.execute.mockRejectedValue(new ConflictError('Not this player\'s turn'));
 
       const ack = jest.fn();

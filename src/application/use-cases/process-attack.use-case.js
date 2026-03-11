@@ -32,12 +32,9 @@ export class ProcessAttackUseCase {
     this.realtimePort = realtimePort;
   }
 
-  async execute({ lobbyId, attackerPlayerId, defenderPlayerId }) {
-    if (!lobbyId || !attackerPlayerId || !defenderPlayerId) {
-      throw new ValidationError('lobbyId, attackerPlayerId and defenderPlayerId are required');
-    }
-    if (attackerPlayerId === defenderPlayerId) {
-      throw new ValidationError('Attacker and defender must be different players');
+  async execute({ lobbyId, attackerPlayerId }) {
+    if (!lobbyId || !attackerPlayerId) {
+      throw new ValidationError('lobbyId and attackerPlayerId are required');
     }
 
     const lobby = await this.lobbyRepository.findById(lobbyId);
@@ -46,6 +43,11 @@ export class ProcessAttackUseCase {
     }
     if (lobby.status !== 'battling') {
       throw new ConflictError('Battle is not in progress');
+    }
+
+    const defenderPlayerId = (lobby.playerIds ?? []).find((id) => id !== attackerPlayerId);
+    if (!defenderPlayerId) {
+      throw new ValidationError('No opponent in this lobby');
     }
 
     const battle = await this.battleRepository.findByLobbyId(lobbyId);
