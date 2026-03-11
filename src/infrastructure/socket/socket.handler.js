@@ -84,7 +84,17 @@ export class SocketHandler {
 
   async handleAssignPokemon(socket, payload, ack) {
     try {
-      const { lobbyId, playerId } = payload ?? {};
+      const lobbyId = socket.data.lobbyId;
+      const playerId = socket.data.playerId;
+      if (!lobbyId || !playerId) {
+        throw new ValidationError(
+          'This connection has no player context. Send join_lobby with a nickname on this same connection first.'
+        );
+      }
+      if (payload?.lobbyId && payload.lobbyId !== lobbyId) {
+        throw new ValidationError('Socket is not in this lobby');
+      }
+
       const team = await this.assignTeamUseCase.execute({ lobbyId, playerId });
 
       if (lobbyId && !socket.rooms.has(ROOM_PREFIX + lobbyId)) {
@@ -109,7 +119,17 @@ export class SocketHandler {
 
   async handleReady(socket, payload, ack) {
     try {
-      const { lobbyId, playerId } = payload ?? {};
+      const lobbyId = socket.data.lobbyId;
+      const playerId = socket.data.playerId;
+      if (!lobbyId || !playerId) {
+        throw new ValidationError(
+          'This connection has no player context. Send join_lobby with a nickname on this same connection first.'
+        );
+      }
+      if (payload?.lobbyId && payload.lobbyId !== lobbyId) {
+        throw new ValidationError('Socket is not in this lobby');
+      }
+
       const lobby = await this.markReadyUseCase.execute({ lobbyId, playerId });
 
       this.realtimePort.notifyLobbyStatus(lobbyId, { lobby });

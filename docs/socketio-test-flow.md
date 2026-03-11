@@ -6,7 +6,7 @@ This document describes how to manually test the PokePVP Socket.IO API using Pos
 
 - Server running at `http://localhost:8080` with `MONGODB_URI` configured
 - MongoDB with clean data (or run `docker compose down -v && docker compose up -d` to reset)
-- Postman with Socket.IO support (or Bruno for REST API cross-verification)
+- Postman with Socket.IO support
 
 ## Connection
 
@@ -33,6 +33,8 @@ Creates or joins an active lobby. First player creates a new lobby; second playe
 
 **Server emits:** `lobby_status` with `{ lobby, player }`
 
+**Important:** The server stores `lobbyId` and `playerId` on the socket connection. All subsequent events (`assign_pokemon`, `ready`, `attack`) use this identity automatically — you do **not** need to send `lobbyId` or `playerId` again.
+
 **Repeat for second player:** `{ "nickname": "PlayerTwo" }` — use a second Postman tab/window to simulate two clients.
 
 ---
@@ -44,23 +46,9 @@ Assigns a random team of 3 Pokémon to a player. Must be called once per player.
 | Field | Value |
 |-------|-------|
 | **Event** | `assign_pokemon` |
-| **Payload** | `{ "lobbyId": "<lobby_id>", "playerId": "<player_id>" }` |
+| **Payload** | `{}` (empty object) |
 
-**Example (Player 1):**
-```json
-{
-  "lobbyId": "69afbab7d49bed3ab81f2c44",
-  "playerId": "69afbab7d49bed3ab81f2c46"
-}
-```
-
-**Example (Player 2):**
-```json
-{
-  "lobbyId": "69afbab7d49bed3ab81f2c44",
-  "playerId": "69afbb47d49bed3ab81f2c4b"
-}
-```
+The server identifies the player and lobby from the socket connection (set during `join_lobby`). No `lobbyId` or `playerId` needed in the payload.
 
 **Response (ack):** `{ id, lobbyId, playerId, pokemonIds }` — team with 3 catalog Pokémon IDs
 
@@ -78,23 +66,9 @@ Marks a player as ready. Both players must call this. When both are ready:
 | Field | Value |
 |-------|-------|
 | **Event** | `ready` |
-| **Payload** | `{ "lobbyId": "<lobby_id>", "playerId": "<player_id>" }` |
+| **Payload** | `{}` (empty object) |
 
-**Example (Player 1):**
-```json
-{
-  "lobbyId": "69afbab7d49bed3ab81f2c44",
-  "playerId": "69afbab7d49bed3ab81f2c46"
-}
-```
-
-**Example (Player 2):**
-```json
-{
-  "lobbyId": "69afbab7d49bed3ab81f2c44",
-  "playerId": "69afbb47d49bed3ab81f2c4b"
-}
-```
+The server identifies the player and lobby from the socket connection (set during `join_lobby`). No `lobbyId` or `playerId` needed in the payload.
 
 **Response (ack):** Updated `lobby` with `readyPlayerIds` and `status: "ready"` when both are ready.
 
@@ -124,7 +98,7 @@ Marks a player as ready. Both players must call this. When both are ready:
 
 ---
 
-### 5. attack
+### 4. attack
 
 Triggers a single attack from the current active Pokémon of the player whose turn it is.
 
@@ -198,25 +172,14 @@ Notes:
 
 1. Connect to `http://localhost:8080`
 2. Add listeners: `lobby_status`, `battle_start`, `turn_result`, `battle_end`, `error`
-3. **join_lobby** with `{ "nickname": "PlayerOne" }` → save `lobby.id` and `player.id`
-4. (Optional) Open second tab, connect, **join_lobby** with `{ "nickname": "PlayerTwo" }` → save both `playerIds`
-5. **assign_pokemon** for Player 1 → `{ lobbyId, playerId }`
-6. **assign_pokemon** for Player 2 → `{ lobbyId, playerId }`
-7. **ready** for Player 1
-8. **ready** for Player 2 → lobby `status` becomes `"ready"`, server emits `battle_start` with initial battle state
+3. **join_lobby** with `{ "nickname": "PlayerOne" }` → save `lobby.id` and `player.id` from the ack
+4. (Second tab) Connect, **join_lobby** with `{ "nickname": "PlayerTwo" }` → save both `playerIds`
+5. **assign_pokemon** with `{}` on Player 1's connection
+6. **assign_pokemon** with `{}` on Player 2's connection
+7. **ready** with `{}` on Player 1's connection
+8. **ready** with `{}` on Player 2's connection → lobby `status` becomes `"ready"`, server emits `battle_start` with initial battle state
 9. Send **attack** events in turn order:
-   - The **first** attack must come from the client whose initial active Pokémon has higher Speed (or lexicographically smaller `playerId` on tie) — this is the `nextToActPlayerId` in `battle_start`.
+   - The **first** attack must come from the client whose `playerId` matches `battle_start.battle.nextToActPlayerId`
    - **After each attack**, the other player must attack next (turns alternate). Use `turn_result.nextToActPlayerId` to know whose turn it is.
    - Payload: `{ "lobbyId": "<lobby_id>" }`
    - Observe `turn_result` and, when appropriate, `battle_end` events
-
----
-
-## Cross-Verification with Bruno (REST API)
-
-You can verify state between Socket.IO steps using Bruno:
-
-- `GET /lobby/active` — current active lobby
-- `GET /lobby/:lobbyId` — lobby by ID
-
-The REST API and Socket.IO share the same use cases and MongoDB, so data stays consistent.
