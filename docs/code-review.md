@@ -35,17 +35,17 @@ Full code review of the PokePVP backend project evaluating hexagonal architectur
 | ~~PERF-3~~ | ~~No timeout on external HTTP calls~~ | ~~MEDIUM~~ | ~~Performance~~ | ✅ Absorbed into ARCH-3 |
 | ~~ARCH-6~~ | ~~LobbyController is redundant — all game flow is Socket.IO~~ | ~~HIGH~~ | ~~Architecture~~ | ✅ Resolved |
 | ARCH-1 | Anemic domain model — business logic in use cases | HIGH | Architecture | Pending |
-| SOLID-1 | SocketHandler has 7 dependencies, mixed responsibilities | HIGH | SOLID | Pending |
+| ~~SOLID-1~~ | ~~SocketHandler has 7 dependencies, mixed responsibilities~~ | ~~HIGH~~ | ~~SOLID~~ | ✅ Resolved |
 | SEC-4 | Nickname without max length validation | MEDIUM | Security | Pending |
 | SEC-5 | MongoDB without authentication in Docker | MEDIUM | Security | Pending |
 | ~~SOLID-2~~ | ~~statusFromError duplicated across multiple files~~ | ~~MEDIUM~~ | ~~SOLID~~ | ✅ Resolved by ARCH-6 |
 | ~~SOLID-3~~ | ~~Dependency wiring duplicated in index.js and app.js~~ | ~~MEDIUM~~ | ~~SOLID~~ | ✅ Resolved by ARCH-6 |
-| ARCH-2 | PersistenceController bypasses use cases | MEDIUM | Architecture | Pending |
+| ~~ARCH-2~~ | ~~PersistenceController bypasses use cases~~ | ~~MEDIUM~~ | ~~Architecture~~ | ✅ Resolved |
 | PERF-4 | No graceful shutdown | MEDIUM | Performance | Pending |
 | ~~CLEAN-1~~ | ~~Inconsistent error handling in controllers~~ | ~~MEDIUM~~ | ~~Clean Code~~ | ✅ Resolved by ARCH-6 |
-| CLEAN-2 | mapRepositoryError has confusing throw pattern | LOW | Clean Code | Pending |
-| CLEAN-3 | Inconsistent error import paths | LOW | Clean Code | Pending |
-| CLEAN-4 | Excessive nested try-catch in socket handler | LOW | Clean Code | Pending |
+| ~~CLEAN-2~~ | ~~mapRepositoryError has confusing throw pattern~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved |
+| ~~CLEAN-3~~ | ~~Inconsistent error import paths~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved |
+| ~~CLEAN-4~~ | ~~Excessive nested try-catch in socket handler~~ | ~~LOW~~ | ~~Clean Code~~ | ✅ Resolved by SOLID-1 |
 | SEC-6 | Stack traces exposed in production logs | LOW | Security | Pending |
 | ARCH-4 | Value objects not implemented | LOW | Architecture | Pending |
 | SCALE-1 | Socket.IO without adapter for horizontal scaling | LOW (for MVP) | Scalability | Pending |
@@ -222,15 +222,17 @@ In hexagonal architecture, the domain should contain the core business logic, no
 
 ---
 
-### ARCH-2 — PersistenceController Bypasses Use Cases [MEDIUM]
+### ~~ARCH-2~~ — PersistenceController Bypasses Use Cases [MEDIUM] ✅ Resolved
 
-**Problem:** `src/infrastructure/http/persistence.controller.js` calls repositories directly (`this.lobbyRepository.save(...)`, `this.playerRepository.save(...)`) without going through use cases. This violates the hexagonal flow where input adapters should only interact with use cases.
+**Resolution:**
 
-The controller is not mounted in `src/app.js` (only its test exists), suggesting it's legacy code from Stage 3.
+Deleted as legacy code. The controller was never mounted in `src/app.js` — only its test existed.
 
-**Recommended fix:**
-- If it's legacy/debug code: delete `persistence.controller.js` and `persistence.controller.test.js`.
-- If it's needed for development: move it to a `dev-tools/` folder and guard it with `NODE_ENV !== 'production'`.
+**Files deleted (2 files):**
+- `src/infrastructure/http/persistence.controller.js`
+- `src/infrastructure/http/__tests__/persistence.controller.test.js`
+
+This also removed the last consumer of the `statusFromError` / `sendError` pattern outside `app.js`, and the last consumer of the re-exported application errors from `infrastructure/errors/` (enabling CLEAN-3).
 
 ---
 
@@ -264,31 +266,31 @@ Refactored `src/infrastructure/clients/pokeapi.adapter.js` from a plain object l
 
 ## 4. SOLID Principles
 
-### SOLID-1 — SocketHandler Has Too Many Responsibilities (SRP) [HIGH]
+### ~~SOLID-1~~ — SocketHandler Has Too Many Responsibilities (SRP) [HIGH] ✅ Resolved
 
-**Problem:** `src/infrastructure/socket/socket.handler.js` constructor receives 7 dependencies:
-```javascript
-constructor(
-  joinLobbyUseCase,      // 1
-  assignTeamUseCase,     // 2
-  markReadyUseCase,      // 3
-  startBattleUseCase,    // 4
-  processAttackUseCase,  // 5
-  realtimePort,          // 6
-  lobbyRepository        // 7 — direct repo access
-)
-```
+**Resolution:**
 
-Additionally, `handleAttack` (lines 159-166) uses `lobbyRepository` directly to find the opponent, which should be part of a use case:
-```javascript
-const lobby = await this.lobbyRepository.findById(lobbyId);
-const defenderPlayerId = (lobby.playerIds ?? []).find((id) => id !== attackerPlayerId);
-```
+Reduced SocketHandler from 7 to 6 dependencies by removing `lobbyRepository`. Also eliminated excessive nested try-catch (CLEAN-4) in the same refactor.
 
-**Recommended fix:**
-- Move "find opponent" logic into `ProcessAttackUseCase` — the use case should accept only `{ lobbyId, attackerPlayerId }` and resolve the defender internally.
-- Remove `lobbyRepository` from `SocketHandler` constructor (6 dependencies instead of 7).
-- Consider splitting the handler into smaller handlers per event group if it grows further.
+**Changes to `ProcessAttackUseCase`:**
+- Signature changed from `execute({ lobbyId, attackerPlayerId, defenderPlayerId })` to `execute({ lobbyId, attackerPlayerId })`.
+- The use case already fetches the lobby internally — it now resolves the defender from `lobby.playerIds` instead of receiving it from the handler.
+- Added validation: throws `ValidationError('No opponent in this lobby')` when attacker is alone.
+
+**Changes to `AssignTeamUseCase`:**
+- Now returns `{ team, lobby }` instead of just the team. The use case already fetches the lobby for validation, so this is zero-cost and lets the handler notify `lobby_status` without needing its own repository access.
+
+**Changes to `SocketHandler`:**
+- Removed `lobbyRepository` from constructor (6 dependencies instead of 7).
+- Created `safeAck(ack, payload)` — wraps ack calls in try-catch to prevent serialization errors from crashing the handler.
+- Created `wrapHandler(fn, eventName)` — async wrapper that catches all errors, emits `error` event, and calls `safeAck` with the error payload. Each handler now simply returns its ack payload or throws.
+- Extracted `requirePlayerContext(socket)` — shared validation for `assign_pokemon`, `ready`, and `attack` events.
+- All nested try-catch blocks eliminated (CLEAN-4 resolved).
+
+**Changes to `index.js`:**
+- Removed `repositories.lobbyRepository` from `SocketHandler` constructor call.
+
+**Tests:** 13 test files, 93 tests passing (up from 91 — added "attacker alone in lobby" and "no player context on assign" tests).
 
 ---
 
@@ -374,83 +376,47 @@ process.on('SIGINT', () => shutdown(server, io));
 
 ---
 
-### CLEAN-2 — mapRepositoryError Has Confusing Pattern [LOW]
+### ~~CLEAN-2~~ — mapRepositoryError Has Confusing Pattern [LOW] ✅ Resolved
 
-**Problem:** `src/infrastructure/persistence/mongodb/map-repository-error.js` always throws, but its name and usage suggest it might return:
+**Resolution:**
 
-```javascript
-// lobby.mongo.repository.js:38-40
-} catch (err) {
-  mapRepositoryError(err); // always throws, but looks like it might silently return
-}
-```
+Renamed `mapRepositoryError` → `throwMappedError` to make the always-throws intent explicit.
 
-**Recommended fix:**
-- Rename to `throwMappedError(err)` to make intent explicit.
-- Or add JSDoc `@returns {never}` annotation.
-
----
-
-### CLEAN-3 — Inconsistent Error Import Paths [LOW]
-
-**Problem:** Application errors (`ValidationError`, `NotFoundError`, `ConflictError`) are imported from two different paths:
-- `src/application/errors/` (the source)
-- `src/infrastructure/errors/` (re-exports the same classes)
-
-This creates confusion about the canonical location.
-
-**Recommended fix:**
-- Each layer should import errors from its own layer or from the layer above (domain > application).
-- Remove the re-exports from `src/infrastructure/errors/` for application-level errors.
-- Infrastructure code that needs `ValidationError` should import from `../../application/errors/`.
+**Files updated (7 files):**
+- `src/infrastructure/persistence/mongodb/map-repository-error.js` — function renamed
+- `src/infrastructure/persistence/mongodb/adapters/lobby.mongo.repository.js` — import + call updated
+- `src/infrastructure/persistence/mongodb/adapters/player.mongo.repository.js` — import + call updated
+- `src/infrastructure/persistence/mongodb/adapters/team.mongo.repository.js` — import + call updated
+- `src/infrastructure/persistence/mongodb/adapters/battle.mongo.repository.js` — import + call updated
+- `src/infrastructure/persistence/mongodb/adapters/pokemon-state.mongo.repository.js` — import + call updated
+- `src/infrastructure/persistence/mongodb/__tests__/map-repository-error.test.js` — all references updated
 
 ---
 
-### CLEAN-4 — Excessive Nested Try-Catch in Socket Handler [LOW]
+### ~~CLEAN-3~~ — Inconsistent Error Import Paths [LOW] ✅ Resolved
 
-**Problem:** The `ready` and `attack` event handlers in `src/infrastructure/socket/socket.handler.js` have deeply nested try-catch blocks:
+**Resolution:**
 
-```javascript
-// Lines 34-46: ready handler
-socket.on('ready', (payload, ack) => {
-  this.handleReady(socket, payload, ack).catch((err) => {
-    console.error('[ready] handler error', err?.stack ?? err);
-    socket.emit('error', errorPayload(err));
-    if (typeof ack === 'function') {
-      try {           // nested try-catch for ack
-        ack({ error: errorPayload(err) });
-      } catch (ackErr) {
-        console.error('[ready] ack error', ackErr);
-      }
-    }
-  });
-});
-```
+Removed the 3 re-export files from `src/infrastructure/errors/` for application-level errors. All infrastructure code now imports directly from `src/application/errors/`.
 
-And `handleReady` itself (lines 110-140) has another full try-catch with its own nested try-catch for ack.
+**Files deleted (3 files):**
+- `src/infrastructure/errors/Validation.error.js` — was `export { ValidationError } from '../../application/errors/...'`
+- `src/infrastructure/errors/NotFound.error.js` — same pattern
+- `src/infrastructure/errors/Conflict.error.js` — same pattern
 
-**Recommended fix:**
-- Create a helper function for safe ack:
-  ```javascript
-  function safeAck(ack, payload) {
-    if (typeof ack !== 'function') return;
-    try { ack(payload); } catch (e) { console.error('ack error', e); }
-  }
-  ```
-- Create a wrapper for socket event handlers:
-  ```javascript
-  function wrapHandler(handler) {
-    return async (socket, payload, ack) => {
-      try {
-        await handler(socket, payload, ack);
-      } catch (err) {
-        console.error(err);
-        socket.emit('error', errorPayload(err));
-        safeAck(ack, { error: errorPayload(err) });
-      }
-    };
-  }
-  ```
+**Files updated (2 files):**
+- `src/infrastructure/persistence/mongodb/map-repository-error.js` — imports changed from `../../errors/` to `../../../application/errors/`
+- `src/infrastructure/persistence/mongodb/__tests__/map-repository-error.test.js` — imports changed from `../../../errors/` to `../../../../application/errors/`
+
+**What remains in `src/infrastructure/errors/`:**
+- `InvalidConfig.error.js` — infrastructure-native error (not a re-export)
+- `ThirdPartyApiFailed.error.js` — infrastructure-native error (not a re-export)
+
+---
+
+### ~~CLEAN-4~~ — Excessive Nested Try-Catch in Socket Handler [LOW] ✅ Resolved by SOLID-1
+
+**Resolution:** Implemented `safeAck()` and `wrapHandler()` utilities as part of the SOLID-1 refactor. All nested try-catch blocks removed. Each handler now returns its ack payload or throws, and the wrapper handles all error routing uniformly. See SOLID-1 resolution above for details.
 
 ---
 
@@ -458,7 +424,7 @@ And `handleReady` itself (lines 110-140) has another full try-catch with its own
 
 ### Current State
 
-- **13 test files**, 91 tests passing (after ARCH-5, SEC-1, ARCH-6 resolutions)
+- **12 test files**, 78 tests passing (after ARCH-5, SEC-1, ARCH-6, SOLID-1, CLEAN-4, ARCH-2 resolutions)
 - **Coverage thresholds** (jest.config.cjs): statements 80%, branches 44%, functions 80%, lines 80%
 - Branch coverage at 44% indicates many untested code paths
 
@@ -490,8 +456,8 @@ And `handleReady` itself (lines 110-140) has another full try-catch with its own
 |------|-----|--------|
 | ~~**Remove CatalogController, GetPokemonListUseCase, GetPokemonByIdUseCase** (6 files deleted, 2 updated)~~ | ~~ARCH-5~~ | ✅ Done |
 | ~~**Remove LobbyController + session auth** (3 files deleted, 3 updated) — resolves SOLID-2, SOLID-3, CLEAN-1 in cascade~~ | ~~ARCH-6~~ | ✅ Done |
-| Remove PersistenceController (legacy, 2 files deleted) | ARCH-2 | Pending |
-| Simplify SocketHandler — move opponent logic to use case | SOLID-1 | Pending |
+| ~~Remove PersistenceController (legacy, 2 files deleted)~~ | ~~ARCH-2~~ | ✅ Done |
+| ~~Simplify SocketHandler — move opponent logic to use case, create wrapHandler/safeAck (CLEAN-4)~~ | ~~SOLID-1, CLEAN-4~~ | ✅ Done |
 | ~~Convert PokeAPIAdapter to class with mapper, cache, and timeout (Anti-Corruption Layer)~~ | ~~ARCH-3, PERF-1, PERF-2, PERF-3~~ | ✅ Done |
 | ~~Create Composition Root (container.js)~~ | ~~SOLID-3~~ | Resolved by ARCH-6 (no duplication remains) |
 | ~~Centralize error mapping (error-mapper.js)~~ | ~~SOLID-2~~ | Resolved by ARCH-6 + ARCH-2 (single location remains) |
@@ -518,9 +484,9 @@ And `handleReady` itself (lines 110-140) has another full try-catch with its own
 | Task | IDs | Status |
 |------|-----|--------|
 | ~~Simplify controller error handling (delegate to middleware)~~ | ~~CLEAN-1~~ | ✅ Resolved by ARCH-6 |
-| Rename mapRepositoryError | CLEAN-2 | Pending |
-| Fix inconsistent error import paths | CLEAN-3 | Pending |
-| Create socket handler wrapper for try-catch | CLEAN-4 | Pending |
+| ~~Rename mapRepositoryError → throwMappedError~~ | ~~CLEAN-2~~ | ✅ Done |
+| ~~Fix inconsistent error import paths~~ | ~~CLEAN-3~~ | ✅ Done |
+| ~~Create socket handler wrapper for try-catch~~ | ~~CLEAN-4~~ | ✅ Resolved by SOLID-1 |
 | Condition log verbosity on NODE_ENV | SEC-6 | Pending |
 
 ### Stage F — Tests and Documentation (Priority: LOW)

@@ -1,5 +1,5 @@
 import { LobbyModel } from '../schemas/lobby.schema.js';
-import { mapRepositoryError } from '../map-repository-error.js';
+import { throwMappedError } from '../map-repository-error.js';
 
 function toDomain(doc) {
   if (!doc) return null;
@@ -36,7 +36,7 @@ export class LobbyMongoRepository {
       }
       return toDomain(doc);
     } catch (err) {
-      mapRepositoryError(err);
+      throwMappedError(err);
     }
   }
 

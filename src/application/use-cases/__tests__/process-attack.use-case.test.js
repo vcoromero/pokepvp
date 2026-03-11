@@ -67,11 +67,10 @@ describe('ProcessAttackUseCase', () => {
     lobbyRepository.save.mockResolvedValue({ ...battlingLobby, status: 'finished' });
   });
 
-  it('applies damage and notifies turn result when it is attacker\'s turn', async () => {
+  it('resolves defender from lobby playerIds and applies damage', async () => {
     const result = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p1',
-      defenderPlayerId: 'p2',
     });
 
     expect(pokemonStateRepository.save).toHaveBeenCalledWith(
@@ -97,7 +96,6 @@ describe('ProcessAttackUseCase', () => {
   });
 
   it('applies minimum damage of 1 when attack - defense < 1', async () => {
-    catalogPort.getById.mockResolvedValue({ id: 1, attack: 10, defense: 100, speed: 50 });
     catalogPort.getById.mockImplementation((id) =>
       Promise.resolve({
         id,
@@ -110,7 +108,6 @@ describe('ProcessAttackUseCase', () => {
     const result = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p1',
-      defenderPlayerId: 'p2',
     });
 
     expect(result.defender.damage).toBe(1);
@@ -138,7 +135,6 @@ describe('ProcessAttackUseCase', () => {
     const result = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p1',
-      defenderPlayerId: 'p2',
     });
 
     expect(result.defender.defeated).toBe(true);
@@ -164,7 +160,6 @@ describe('ProcessAttackUseCase', () => {
     const result = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p1',
-      defenderPlayerId: 'p2',
     });
 
     expect(result.battleFinished).toBe(true);
@@ -189,7 +184,6 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(ConflictError);
 
@@ -204,7 +198,6 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(ConflictError);
   });
@@ -216,7 +209,6 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(ConflictError);
   });
@@ -228,7 +220,6 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(NotFoundError);
   });
@@ -240,7 +231,6 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(NotFoundError);
   });
@@ -257,23 +247,33 @@ describe('ProcessAttackUseCase', () => {
       useCase.execute({
         lobbyId: 'l1',
         attackerPlayerId: 'p1',
-        defenderPlayerId: 'p2',
       })
     ).rejects.toThrow(ConflictError);
   });
 
   it('throws ValidationError when required input is missing', async () => {
     await expect(useCase.execute({ lobbyId: 'l1' })).rejects.toThrow(ValidationError);
-    await expect(useCase.execute({ attackerPlayerId: 'p1', defenderPlayerId: 'p2' })).rejects.toThrow(
-      ValidationError
-    );
+    await expect(useCase.execute({ attackerPlayerId: 'p1' })).rejects.toThrow(ValidationError);
+  });
+
+  it('throws ValidationError when attacker is alone in lobby', async () => {
+    lobbyRepository.findById.mockResolvedValue({
+      ...battlingLobby,
+      playerIds: ['p1'],
+    });
+
+    await expect(
+      useCase.execute({
+        lobbyId: 'l1',
+        attackerPlayerId: 'p1',
+      })
+    ).rejects.toThrow(ValidationError);
   });
 
   it('allows defender to attack on next turn (alternation)', async () => {
     const result1 = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p1',
-      defenderPlayerId: 'p2',
     });
     expect(result1.nextToActPlayerId).toBe('p2');
 
@@ -285,7 +285,6 @@ describe('ProcessAttackUseCase', () => {
     const result2 = await useCase.execute({
       lobbyId: 'l1',
       attackerPlayerId: 'p2',
-      defenderPlayerId: 'p1',
     });
 
     expect(result2.attacker.playerId).toBe('p2');
