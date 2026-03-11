@@ -41,7 +41,7 @@ async function start() {
       battleRepository: new BattleMongoRepository(),
       pokemonStateRepository: new PokemonStateMongoRepository(),
     };
-    const catalogPort = PokeAPIAdapter;
+    const catalogPort = new PokeAPIAdapter(process.env.POKEAPI_BASE_URL);
     const joinLobbyUseCase = new JoinLobbyUseCase(
       repositories.playerRepository,
       repositories.lobbyRepository

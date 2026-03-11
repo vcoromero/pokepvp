@@ -3,7 +3,6 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { io as ioClient } from 'socket.io-client';
 import { createApp } from '../app.js';
-import { PokeAPIAdapter } from '../infrastructure/clients/pokeapi.adapter.js';
 import { JoinLobbyUseCase } from '../application/use-cases/join-lobby.use-case.js';
 import { AssignTeamUseCase } from '../application/use-cases/assign-team.use-case.js';
 import { MarkReadyUseCase } from '../application/use-cases/mark-ready.use-case.js';
@@ -51,16 +50,7 @@ describe('Socket.IO integration', () => {
       saveMany: jest.fn().mockResolvedValue([]),
     };
 
-    const app = createApp({
-      catalogPort: mockCatalogPort,
-      repositories: {
-        lobbyRepository: mockLobbyRepository,
-        playerRepository: mockPlayerRepository,
-        teamRepository: mockTeamRepository,
-        battleRepository: mockBattleRepository,
-        pokemonStateRepository: mockPokemonStateRepository,
-      },
-    });
+    const app = createApp();
 
     server = http.createServer(app);
     const io = new Server(server, {

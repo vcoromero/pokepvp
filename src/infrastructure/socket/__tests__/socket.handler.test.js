@@ -146,6 +146,8 @@ describe('SocketHandler', () => {
     it('calls use case, joins room if not in it, notifies lobby status, acks with team', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
       socket.rooms.add('other');
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
@@ -155,7 +157,7 @@ describe('SocketHandler', () => {
       lobbyRepository.findById.mockResolvedValue({ id: 'l1', status: 'waiting', playerIds: ['p1', 'p2'] });
 
       const ack = jest.fn();
-      socket._trigger('assign_pokemon', { lobbyId: 'l1', playerId: 'p1' }, ack);
+      socket._trigger('assign_pokemon', { lobbyId: 'l1' }, ack);
 
       await new Promise((r) => setTimeout(r, 0));
 
@@ -169,6 +171,8 @@ describe('SocketHandler', () => {
     it('does not join if socket already in room', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
       socket.rooms.add('lobby:l1');
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
@@ -176,7 +180,7 @@ describe('SocketHandler', () => {
       assignTeamUseCase.execute.mockResolvedValue({ id: 't1', lobbyId: 'l1', playerId: 'p1', pokemonIds: [1, 2, 3] });
       lobbyRepository.findById.mockResolvedValue({ id: 'l1' });
 
-      socket._trigger('assign_pokemon', { lobbyId: 'l1', playerId: 'p1' }, jest.fn());
+      socket._trigger('assign_pokemon', { lobbyId: 'l1' }, jest.fn());
 
       await new Promise((r) => setTimeout(r, 0));
 
@@ -187,13 +191,15 @@ describe('SocketHandler', () => {
     it('emits error when use case throws NotFoundError', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
       assignTeamUseCase.execute.mockRejectedValue(new NotFoundError('Lobby not found'));
 
       const ack = jest.fn();
-      socket._trigger('assign_pokemon', { lobbyId: 'l1', playerId: 'p1' }, ack);
+      socket._trigger('assign_pokemon', { lobbyId: 'l1' }, ack);
 
       await new Promise((r) => setTimeout(r, 0));
 
@@ -206,6 +212,8 @@ describe('SocketHandler', () => {
     it('calls use case, notifies lobby status, acks with lobby', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
@@ -213,7 +221,7 @@ describe('SocketHandler', () => {
       markReadyUseCase.execute.mockResolvedValue(lobby);
 
       const ack = jest.fn();
-      socket._trigger('ready', { lobbyId: 'l1', playerId: 'p1' }, ack);
+      socket._trigger('ready', { lobbyId: 'l1' }, ack);
 
       await new Promise((r) => setTimeout(r, 0));
 
@@ -226,6 +234,8 @@ describe('SocketHandler', () => {
     it('calls startBattleUseCase when lobby becomes ready', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p2';
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
@@ -234,7 +244,7 @@ describe('SocketHandler', () => {
       startBattleUseCase.execute.mockResolvedValue({ battle: {}, pokemonStates: [] });
 
       const ack = jest.fn();
-      socket._trigger('ready', { lobbyId: 'l1', playerId: 'p2' }, ack);
+      socket._trigger('ready', { lobbyId: 'l1' }, ack);
 
       await new Promise((r) => setTimeout(r, 0));
 
@@ -247,13 +257,15 @@ describe('SocketHandler', () => {
     it('emits error when use case throws ConflictError', async () => {
       const mockIo = createMockIo();
       const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
       handler.attach(mockIo);
       mockIo._simulateConnection(socket);
 
       markReadyUseCase.execute.mockRejectedValue(new ConflictError('Lobby is full'));
 
       const ack = jest.fn();
-      socket._trigger('ready', { lobbyId: 'l1', playerId: 'p1' }, ack);
+      socket._trigger('ready', { lobbyId: 'l1' }, ack);
 
       await new Promise((r) => setTimeout(r, 0));
 
