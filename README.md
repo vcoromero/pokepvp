@@ -23,6 +23,10 @@ This project is built with:
 
 The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full picture of layers, ports, and adapters, see [docs/architecture.md](docs/architecture.md). All six stages of the [phased plan](docs/phased-plan.md) are implemented (catalog, lobby, team selection, Socket.IO real-time, and full battle with turns, damage, and game end).
 
+**Current setup:** MongoDB can be run locally via **Docker Compose** (MongoDB 7 with auth and configurable port) or by using **MongoDB Atlas**; the app connects using the single `MONGODB_URI` in `.env`.
+
+**Live deployment:** The backend is deployed on [Render](https://pokepvp.onrender.com); the database runs on **MongoDB Atlas**. Both the app and the database are hosted in the cloud.
+
 ## 🛠️ Scripts
 
 - `npm run dev` — Start server with nodemon (hot reload)
@@ -30,21 +34,40 @@ The stack includes **Express**, **MongoDB**, and **Socket.IO**. For a full pictu
 - `npm run test:watch` — Run tests in watch mode
 - `npm run test:coverage` — Run tests with coverage report
 
-## 🐳 Running MongoDB (Docker Compose)
+## 🐳 Database: MongoDB (Docker or Atlas)
 
-Persistence (Stage 3+) uses **MongoDB**. The repo provides a **Docker Compose** file that runs only MongoDB (the backend runs on your machine with `npm run dev`).
+Persistence uses **MongoDB**. You can run it locally with **Docker Compose** or use **MongoDB Atlas** (cloud).
+
+### Option A: Docker Compose (local MongoDB 7)
+
+The project includes a **docker-compose.yml** that runs **MongoDB 7** with authentication:
+
+- **Image:** `mongo:7`
+- **Credentials:** user `pokepvp`, password from `MONGO_PASSWORD` (default: `devpassword`)
+- **Port:** configurable via `MONGO_HOST_PORT` (default: `27017`)
+- **Data:** persisted in a named volume `mongo-data`
+
+**Steps:**
 
 1. Copy `.env.example` to `.env` and set at least `PORT`, `POKEAPI_BASE_URL`, and `MONGODB_URI`.
-2. Start MongoDB: `docker-compose up -d`
-3. Start the backend: `npm run dev`
+2. For local Docker, use a URI with auth, e.g.  
+   `MONGODB_URI=mongodb://pokepvp:devpassword@localhost:27017/pokepvp?authSource=admin`  
+   (replace the port if you set `MONGO_HOST_PORT`).
+3. Start MongoDB: `docker-compose up -d`
+4. Start the backend: `npm run dev`
 
-**Default:** MongoDB is exposed on host port **27017**. Use `MONGODB_URI=mongodb://localhost:27017/pokepvp` in your `.env`.
+**If port 27017 is in use:** set `MONGO_HOST_PORT=27018` (or another free port) in `.env` and use the same port in `MONGODB_URI`, e.g. `mongodb://pokepvp:devpassword@localhost:27018/pokepvp?authSource=admin`.
 
-**If port 27017 is already in use** (e.g. you have another MongoDB container or service):
+### Option B: MongoDB Atlas (cloud)
 
-- In your `.env`, set a free host port, e.g. `MONGO_HOST_PORT=27018`.
-- In the same `.env`, set the app to use that port: `MONGODB_URI=mongodb://localhost:27018/pokepvp`.
-- Then run `docker-compose up -d`. The Compose file reads `MONGO_HOST_PORT` and maps that host port to MongoDB; the app connects via `MONGODB_URI`, so both must use the same port number.
+You can connect to **MongoDB Atlas** instead of running Docker:
+
+1. Create a cluster and database user in [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. In `.env`, set `MONGODB_URI` to your Atlas connection string, e.g.  
+   `MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<db>?retryWrites=true&w=majority`
+3. Do **not** start Docker for MongoDB; run only the backend: `npm run dev`.
+
+The app uses a single `MONGODB_URI`; switch between local Docker and Atlas by changing that variable.
 
 ## 📚 Documentation
 
@@ -52,6 +75,14 @@ Persistence (Stage 3+) uses **MongoDB**. The repo provides a **Docker Compose** 
 - **[docs/architecture.md](docs/architecture.md)** — Backend architecture: hexagonal layout, event-driven communication, SOLID/Clean Code, and a layers diagram.
 - **[docs/phased-plan.md](docs/phased-plan.md)** — Phased implementation plan: Stage 1 (minimal Express + PokeAPI proxy) through Stage 6 (full battle and events).
 - **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, assign_pokemon, ready, attack) using Postman or similar.
+
+## ☁️ Deploy on Render
+
+You can deploy this backend to [Render](https://render.com) as a **Web Service** (no Docker required). You need a MongoDB in the cloud (e.g. [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)); Render does not provide MongoDB.
+
+**Quick steps:** Connect your GitHub/GitLab repo → New → **Web Service** → choose the repo → Runtime **Node** → Build: `npm install`, Start: `npm start` → Add env vars: `MONGODB_URI` (Atlas URI), `POKEAPI_BASE_URL`, and optionally `CORS_ORIGIN` (your frontend URL). Then Create Web Service.
+
+Full step-by-step and troubleshooting: **[docs/render-deploy.md](docs/render-deploy.md)**.
 
 ## 🚀 Future improvements
 
