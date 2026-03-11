@@ -352,5 +352,113 @@ describe('SocketHandler', () => {
       expect(processAttackUseCase.execute).not.toHaveBeenCalled();
       expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ValidationError', message: 'Socket is not in this lobby' });
     });
+
+    it('emits ValidationError when lobbyId is missing from payload', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('attack', {}, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(processAttackUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ValidationError', message: 'lobbyId is required' });
+    });
+
+    it('emits ValidationError when socket has no playerId', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('attack', { lobbyId: 'l1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(processAttackUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', expect.objectContaining({ code: 'ValidationError' }));
+    });
+  });
+
+  describe('security — lobbyId spoofing prevention', () => {
+    it('assign_pokemon rejects when payload lobbyId differs from socket context', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('assign_pokemon', { lobbyId: 'l2' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(assignTeamUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ValidationError', message: 'Socket is not in this lobby' });
+      expect(ack).toHaveBeenCalledWith({ error: { code: 'ValidationError', message: 'Socket is not in this lobby' } });
+    });
+
+    it('ready rejects when payload lobbyId differs from socket context', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('ready', { lobbyId: 'l2' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(markReadyUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'ValidationError', message: 'Socket is not in this lobby' });
+      expect(ack).toHaveBeenCalledWith({ error: { code: 'ValidationError', message: 'Socket is not in this lobby' } });
+    });
+
+    it('ready rejects when socket has no player context', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('ready', {}, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(markReadyUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', expect.objectContaining({ code: 'ValidationError' }));
+    });
+  });
+
+  describe('safeAck resilience', () => {
+    it('does not crash when ack callback throws', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      joinLobbyUseCase.execute.mockResolvedValue({
+        player: { id: 'p1', lobbyId: 'l1' },
+        lobby: { id: 'l1', status: 'waiting' },
+      });
+
+      const badAck = jest.fn(() => { throw new Error('serialization failed'); });
+      socket._trigger('join_lobby', { nickname: 'Ash' }, badAck);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(badAck).toHaveBeenCalled();
+      expect(socket.join).toHaveBeenCalledWith('lobby:l1');
+    });
   });
 });

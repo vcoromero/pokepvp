@@ -193,4 +193,31 @@ describe('StartBattleUseCase', () => {
       })
     );
   });
+
+  it('re-emits battle_start when lobby is already battling with an active battle', async () => {
+    lobbyRepository.findById.mockResolvedValue({ ...readyLobby, status: 'battling' });
+    const existingBattle = { id: 'b0', lobbyId: 'l1', winnerId: null, nextToActPlayerId: 'p2' };
+    const existingStates = [
+      { battleId: 'b0', pokemonId: 1, playerId: 'p1', currentHp: 40, defeated: false },
+    ];
+    battleRepository.findByLobbyId.mockResolvedValue(existingBattle);
+    pokemonStateRepository.findByBattleId.mockResolvedValue(existingStates);
+
+    const result = await useCase.execute({ lobbyId: 'l1' });
+
+    expect(teamRepository.findByLobby).not.toHaveBeenCalled();
+    expect(battleRepository.save).not.toHaveBeenCalled();
+    expect(realtimePort.notifyBattleStart).toHaveBeenCalledWith('l1', {
+      battle: existingBattle,
+      pokemonStates: existingStates,
+    });
+    expect(result.battle).toEqual(existingBattle);
+  });
+
+  it('throws ConflictError when lobby is battling but battle has a winner', async () => {
+    lobbyRepository.findById.mockResolvedValue({ ...readyLobby, status: 'battling' });
+    battleRepository.findByLobbyId.mockResolvedValue({ id: 'b0', lobbyId: 'l1', winnerId: 'p1' });
+
+    await expect(useCase.execute({ lobbyId: 'l1' })).rejects.toThrow(ConflictError);
+  });
 });

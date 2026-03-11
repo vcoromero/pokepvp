@@ -1,16 +1,6 @@
 import { ValidationError } from '../errors/Validation.error.js';
 import { NotFoundError } from '../errors/NotFound.error.js';
-
-function hasBothPlayersReady(lobby) {
-  const playerIds = lobby.playerIds ?? [];
-  const readyPlayerIds = lobby.readyPlayerIds ?? [];
-
-  if (playerIds.length !== 2 || readyPlayerIds.length < 2) {
-    return false;
-  }
-
-  return playerIds.every((playerId) => readyPlayerIds.includes(playerId));
-}
+import { Lobby } from '../../domain/entities/lobby.entity.js';
 
 export class MarkReadyUseCase {
   constructor(lobbyRepository, teamRepository) {
@@ -23,12 +13,11 @@ export class MarkReadyUseCase {
       throw new ValidationError('lobbyId and playerId are required');
     }
 
-    const lobby = await this.lobbyRepository.findById(lobbyId);
+    const lobby = Lobby.from(await this.lobbyRepository.findById(lobbyId));
     if (!lobby) {
       throw new NotFoundError('Lobby not found');
     }
-
-    if (!(lobby.playerIds ?? []).includes(playerId)) {
+    if (!lobby.hasPlayer(playerId)) {
       throw new NotFoundError('Player is not in this lobby');
     }
 
@@ -37,24 +26,19 @@ export class MarkReadyUseCase {
       throw new ValidationError('Player must have an assigned team before marking ready');
     }
 
-    const readyPlayerIds = new Set(lobby.readyPlayerIds ?? []);
-    if (readyPlayerIds.has(playerId)) {
-      return lobby;
+    if (lobby.isAlreadyReady(playerId)) {
+      return lobby.toPlain();
     }
 
-    readyPlayerIds.add(playerId);
-    const updatedLobby = await this.lobbyRepository.save({
-      ...lobby,
-      readyPlayerIds: [...readyPlayerIds],
-    });
+    const readied = lobby.markReady(playerId);
+    const saved = await this.lobbyRepository.save(readied.toPlain());
 
-    if (hasBothPlayersReady(updatedLobby)) {
-      return this.lobbyRepository.save({
-        ...updatedLobby,
-        status: 'ready',
-      });
+    if (Lobby.from(saved).isEveryoneReady()) {
+      return this.lobbyRepository.save(
+        Lobby.from(saved).withStatus('ready').toPlain()
+      );
     }
 
-    return updatedLobby;
+    return saved;
   }
 }

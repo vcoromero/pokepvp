@@ -104,4 +104,24 @@ describe('JoinLobbyUseCase', () => {
       .rejects
       .toBeInstanceOf(ValidationError);
   });
+
+  it('throws ValidationError when nickname exceeds 30 characters', async () => {
+    const longName = 'A'.repeat(31);
+    await expect(useCase.execute({ nickname: longName }))
+      .rejects
+      .toThrow('nickname must be 30 characters or fewer');
+  });
+
+  it('accepts nickname of exactly 30 characters', async () => {
+    const exactName = 'A'.repeat(30);
+    lobbyRepository.findActive.mockResolvedValue(null);
+    lobbyRepository.save
+      .mockResolvedValueOnce({ id: 'l1', status: 'waiting', playerIds: [], readyPlayerIds: [] })
+      .mockResolvedValueOnce({ id: 'l1', status: 'waiting', playerIds: ['p1'], readyPlayerIds: [] });
+    playerRepository.save.mockResolvedValue({ id: 'p1', nickname: exactName, lobbyId: 'l1' });
+
+    const result = await useCase.execute({ nickname: exactName });
+
+    expect(result.player.nickname).toBe(exactName);
+  });
 });

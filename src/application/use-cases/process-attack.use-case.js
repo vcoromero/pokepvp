@@ -1,6 +1,7 @@
 import { NotFoundError } from '../errors/NotFound.error.js';
 import { ConflictError } from '../errors/Conflict.error.js';
 import { ValidationError } from '../errors/Validation.error.js';
+import { calculateDamage } from '../../domain/services/damage-calculator.js';
 
 function getActivePokemon(team, statesByKey) {
   const playerId = team.playerId;
@@ -93,7 +94,7 @@ export class ProcessAttackUseCase {
       throw new NotFoundError('Catalog data not found for active Pokémon');
     }
 
-    const damage = Math.max(1, (attackerDetail.attack ?? 0) - (defenderDetail.defense ?? 0));
+    const damage = calculateDamage(attackerDetail.attack, defenderDetail.defense);
     const previousHp = defenderActive.state.currentHp;
     const currentHp = Math.max(0, previousHp - damage);
     const defeated = currentHp === 0;

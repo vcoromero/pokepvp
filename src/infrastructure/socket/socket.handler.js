@@ -16,13 +16,21 @@ function safeAck(ack, payload) {
   }
 }
 
+function logError(eventName, err) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(`[${eventName}] [${err.name}] ${err.message}`);
+  } else {
+    console.error(`[${eventName}] error`, err?.stack ?? err);
+  }
+}
+
 function wrapHandler(fn, eventName) {
   return async (socket, payload, ack) => {
     try {
       const result = await fn(socket, payload);
       safeAck(ack, result);
     } catch (err) {
-      console.error(`[${eventName}] error`, err?.stack ?? err);
+      logError(eventName, err);
       socket.emit('error', errorPayload(err));
       safeAck(ack, { error: errorPayload(err) });
     }

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import http from 'http';
+import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import { createApp } from './app.js';
 import { connect } from './infrastructure/persistence/mongodb/connection.js';
@@ -86,6 +87,25 @@ async function start() {
   server.listen(PORT, HOST, () => {
     console.log(`PokePVP server listening on http://${HOST}:${PORT}`);
   });
+
+  function shutdown(signal) {
+    console.log(`\n${signal} received — shutting down gracefully...`);
+    io.close();
+    server.close(async () => {
+      try {
+        await mongoose.connection.close();
+      } catch { /* already closed */ }
+      console.log('Server closed.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout.');
+      process.exit(1);
+    }, 10_000);
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 start().catch((err) => {

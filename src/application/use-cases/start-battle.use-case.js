@@ -1,27 +1,7 @@
 import { NotFoundError } from '../errors/NotFound.error.js';
 import { ConflictError } from '../errors/Conflict.error.js';
 import { ValidationError } from '../errors/Validation.error.js';
-
-/**
- * Returns the playerId who acts first (first turn only), using Speed and deterministic tiebreaker.
- * @param {{ speed?: number }} detailA - Catalog detail for player A's initial active Pokémon
- * @param {{ speed?: number }} detailB - Catalog detail for player B's initial active Pokémon
- * @param {string} playerIdA - Player A id
- * @param {string} playerIdB - Player B id
- * @param {number} pokemonIdA - Player A's initial active Pokémon id
- * @param {number} pokemonIdB - Player B's initial active Pokémon id
- * @returns {string} playerIdA or playerIdB
- */
-function getFirstToActPlayerId(detailA, detailB, playerIdA, playerIdB, pokemonIdA, pokemonIdB) {
-  const speedA = detailA.speed ?? 0;
-  const speedB = detailB.speed ?? 0;
-  if (speedA > speedB) return playerIdA;
-  if (speedB > speedA) return playerIdB;
-  const cmp = (playerIdA || '').localeCompare(playerIdB || '');
-  if (cmp < 0) return playerIdA;
-  if (cmp > 0) return playerIdB;
-  return (pokemonIdA ?? 0) <= (pokemonIdB ?? 0) ? playerIdA : playerIdB;
-}
+import { resolveFirstTurn } from '../../domain/services/turn-resolver.js';
 
 export class StartBattleUseCase {
   constructor(
@@ -49,7 +29,7 @@ export class StartBattleUseCase {
     if (!lobby) {
       throw new NotFoundError('Lobby not found');
     }
-    // Re-emit battle_start when lobby is already battling (e.g. client re-sent ready or reconnected)
+
     if (lobby.status === 'battling') {
       const existingBattle = await this.battleRepository.findByLobbyId(lobbyId);
       if (existingBattle && !existingBattle.winnerId) {
@@ -97,14 +77,15 @@ export class StartBattleUseCase {
     if (!detailA || !detailB) {
       throw new ValidationError('Missing catalog data for initial active Pokémon');
     }
-    const nextToActPlayerId = getFirstToActPlayerId(
-      detailA,
-      detailB,
-      teamA.playerId,
-      teamB.playerId,
+
+    const nextToActPlayerId = resolveFirstTurn({
+      speedA: detailA.speed ?? 0,
+      speedB: detailB.speed ?? 0,
+      playerIdA: teamA.playerId,
+      playerIdB: teamB.playerId,
       pokemonIdA,
-      pokemonIdB
-    );
+      pokemonIdB,
+    });
 
     const battle = await this.battleRepository.save({
       lobbyId,
