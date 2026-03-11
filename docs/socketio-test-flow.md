@@ -29,7 +29,15 @@ Creates or joins an active lobby. First player creates a new lobby; second playe
 | **Event** | `join_lobby` |
 | **Payload** | `{ "nickname": "PlayerOne" }` |
 
-**Response (ack):** `{ player, lobby }` — player with `id`, `nickname`, `lobbyId`; lobby with `id`, `status`, `playerIds`, `readyPlayerIds`, `createdAt`
+**Ack (success):**
+```json
+{
+  "player": { "id": "<player_id>", "nickname": "PlayerOne", "lobbyId": "<lobby_id>" },
+  "lobby": { "id": "<lobby_id>", "status": "waiting", "playerIds": ["<player_id>"], "readyPlayerIds": [], "createdAt": "<iso_date>" }
+}
+```
+
+**Ack (error):** `{ "error": { "code": "ValidationError", "message": "..." } }` — e.g. missing or invalid nickname.
 
 **Server emits:** `lobby_status` with `{ lobby, player }`
 
@@ -50,7 +58,25 @@ Assigns a random team of 3 Pokémon to a player. Must be called once per player.
 
 The server identifies the player and lobby from the socket connection (set during `join_lobby`). No `lobbyId` or `playerId` needed in the payload.
 
-**Response (ack):** `{ id, lobbyId, playerId, pokemonIds }` — team with 3 catalog Pokémon IDs
+**Ack (success):**
+```json
+{
+  "team": {
+    "id": "<team_id>",
+    "lobbyId": "<lobby_id>",
+    "playerId": "<player_id>",
+    "pokemonIds": [1, 4, 7],
+    "pokemonDetails": [
+      { "pokemonId": 1, "name": "Bulbasaur", "sprite": "https://...", "type": ["Grass", "Poison"] },
+      { "pokemonId": 4, "name": "Charmander", "sprite": "https://...", "type": ["Fire"] },
+      { "pokemonId": 7, "name": "Squirtle", "sprite": "https://...", "type": ["Water"] }
+    ]
+  },
+  "lobby": { "id": "<lobby_id>", "status": "waiting", "playerIds": [...], "readyPlayerIds": [], "createdAt": "..." }
+}
+```
+
+**Ack (error):** `{ "error": { "code": "ConflictError", "message": "..." } }` — e.g. not enough available Pokémon, or lobby not waiting.
 
 **Server emits:** `lobby_status` with `{ lobby }`
 
@@ -70,12 +96,26 @@ Marks a player as ready. Both players must call this. When both are ready:
 
 The server identifies the player and lobby from the socket connection (set during `join_lobby`). No `lobbyId` or `playerId` needed in the payload.
 
-**Response (ack):** Updated `lobby` with `readyPlayerIds` and `status: "ready"` when both are ready.
+**Ack (success):**
+```json
+{
+  "lobby": {
+    "id": "<lobby_id>",
+    "status": "waiting | ready",
+    "playerIds": ["<p1>", "<p2>"],
+    "readyPlayerIds": ["<p1>", "<p2>"],
+    "createdAt": "<iso_date>"
+  }
+}
+```
+When both players have sent `ready`, the second ack has `status: "ready"`. The server then starts the battle and emits `battle_start` (no extra ack for that).
+
+**Ack (error):** `{ "error": { "code": "ConflictError", "message": "..." } }` — e.g. lobby full, or player not in lobby.
 
 **Server emits:**
 
 - `lobby_status` with `{ lobby }`
-- `battle_start` with:
+- **`battle_start`** (when both are ready) with:
 
 ```json
 {
@@ -87,10 +127,15 @@ The server identifies the player and lobby from the socket connection (set durin
   },
   "pokemonStates": [
     {
+      "id": "<state_id>",
+      "battleId": "<battle_id>",
       "playerId": "<player_id>",
       "pokemonId": 1,
       "currentHp": 45,
-      "defeated": false
+      "defeated": false,
+      "name": "Bulbasaur",
+      "sprite": "https://...",
+      "type": ["Grass", "Poison"]
     }
   ]
 }
@@ -114,7 +159,7 @@ Notes:
 - If it is **not** this player's turn, the server returns a `ConflictError` ("Not this player's turn").
 - If the battle has not started or already finished, the server returns an error.
 
-**Successful response (ack):** same shape as the `turn_result` event:
+**Ack (success):** same shape as the `turn_result` event. The server also emits `turn_result` to the room; the ack is the same payload.
 
 ```json
 {
@@ -122,11 +167,15 @@ Notes:
   "lobbyId": "<lobby_id>",
   "attacker": {
     "playerId": "<attacker_id>",
-    "pokemonId": 1
+    "pokemonId": 1,
+    "name": "Bulbasaur",
+    "sprite": "https://..."
   },
   "defender": {
     "playerId": "<defender_id>",
     "pokemonId": 4,
+    "name": "Charmander",
+    "sprite": "https://...",
     "damage": 12,
     "previousHp": 30,
     "currentHp": 18,
@@ -134,16 +183,19 @@ Notes:
   },
   "nextActivePokemon": {
     "playerId": "<player_who_switched>",
-    "pokemonId": 5
+    "pokemonId": 5,
+    "name": "Squirtle",
+    "sprite": "https://..."
   },
   "battleFinished": false,
   "nextToActPlayerId": "<player_id_who_attacks_next>"
 }
 ```
 
-`nextToActPlayerId` is present when the battle is not finished; it indicates who must send the next `attack`.
+- `nextToActPlayerId` is present when the battle is not finished; it indicates who must send the next `attack`.
+- When a Pokémon is defeated and there is a next one, `nextActivePokemon.pokemonId`, `name`, and `sprite` are set; otherwise `pokemonId` is `null` and name/sprite are empty (e.g. when the battle ends).
 
-**Error response (ack + `error` event):**
+**Ack (error):** On validation or conflict the server emits `error` and the ack receives:
 
 ```json
 {
@@ -153,6 +205,20 @@ Notes:
   }
 }
 ```
+Other possible codes: `ValidationError`, `NotFoundError`.
+
+---
+
+## Ack summary (Client → Server)
+
+| Event | Ack (success) | Ack (error) |
+|-------|----------------|-------------|
+| `join_lobby` | `{ player, lobby }` | `{ error: { code, message } }` |
+| `assign_pokemon` | `{ team, lobby }` — `team` has `pokemonIds` and `pokemonDetails` (name, sprite, type per Pokémon) | `{ error: { code, message } }` |
+| `ready` | `{ lobby }` — includes `readyPlayerIds`, `status` ("waiting" or "ready") | `{ error: { code, message } }` |
+| `attack` | Same as `turn_result` payload (attacker, defender, nextActivePokemon with name/sprite; damage, HP; nextToActPlayerId; battleFinished) | `{ error: { code, message } }` |
+
+If the client does not pass an ack callback, the server still emits `error` on failure but there is no callback to receive the error payload.
 
 ---
 
@@ -162,8 +228,8 @@ Notes:
 |-------|------|---------|
 | `lobby_status` | After `join_lobby`, `assign_pokemon`, or `ready` | `{ lobby, player? }` |
 | `error` | On validation, conflict, or server error | `{ code, message }` |
-| `battle_start` | When both players are ready and the battle is initialized | `{ battle, pokemonStates }` — `battle` includes `nextToActPlayerId` (who attacks first) |
-| `turn_result` | After each valid `attack` | Same as the `attack` ack; includes `nextToActPlayerId` when battle is not finished |
+| `battle_start` | When both players are ready and the battle is initialized | `{ battle, pokemonStates }` — `battle` includes `nextToActPlayerId`; each state has `name`, `sprite`, `type` |
+| `turn_result` | After each valid `attack` | Same as the `attack` ack; includes attacker/defender/nextActivePokemon with name/sprite |
 | `battle_end` | When a player has no remaining Pokémon | `{ battleId, lobbyId, winnerId }` |
 
 ---

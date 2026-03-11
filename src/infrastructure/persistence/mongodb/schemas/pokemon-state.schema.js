@@ -6,6 +6,9 @@ const pokemonStateSchema = new mongoose.Schema({
   playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true },
   currentHp: { type: Number, required: true },
   defeated: { type: Boolean, default: false },
+  name: { type: String, default: '' },
+  sprite: { type: String, default: '' },
+  type: { type: [String], default: [] },
 }, { timestamps: true });
 
 pokemonStateSchema.index({ battleId: 1, playerId: 1, pokemonId: 1 });

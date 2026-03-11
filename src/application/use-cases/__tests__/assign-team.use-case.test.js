@@ -13,6 +13,9 @@ describe('AssignTeamUseCase', () => {
   beforeEach(() => {
     catalogPort = {
       getList: jest.fn(),
+      getById: jest.fn().mockImplementation((id) =>
+        Promise.resolve({ id, name: `Poke${id}`, sprite: `https://example.com/${id}.gif`, type: ['Normal'] })
+      ),
     };
     lobbyRepository = {
       findById: jest.fn(),
@@ -46,11 +49,14 @@ describe('AssignTeamUseCase', () => {
 
     const result = await useCase.execute({ lobbyId: 'l1', playerId: 'p2' });
 
-    expect(teamRepository.save).toHaveBeenCalledWith({
-      lobbyId: 'l1',
-      playerId: 'p2',
-      pokemonIds: [5, 6, 7],
-    });
+    expect(teamRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lobbyId: 'l1',
+        playerId: 'p2',
+        pokemonIds: [5, 6, 7],
+      })
+    );
+    expect(teamRepository.save.mock.calls[0][0].pokemonDetails).toHaveLength(3);
     expect(result.team.pokemonIds).toHaveLength(3);
     expect(result.team.pokemonIds.every((id) => ![1, 2, 3].includes(id))).toBe(true);
     expect(result.lobby).toEqual({

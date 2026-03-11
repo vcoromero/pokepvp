@@ -11,6 +11,9 @@ function toDomain(doc) {
     playerId: obj.playerId?.toString(),
     currentHp: obj.currentHp,
     defeated: obj.defeated ?? false,
+    name: obj.name ?? '',
+    sprite: obj.sprite ?? '',
+    type: Array.isArray(obj.type) ? obj.type : [],
   };
 }
 
@@ -23,6 +26,9 @@ export class PokemonStateMongoRepository {
         playerId: state.playerId,
         currentHp: state.currentHp,
         defeated: state.defeated ?? false,
+        name: state.name ?? '',
+        sprite: state.sprite ?? '',
+        type: Array.isArray(state.type) ? state.type : [],
       };
       let doc;
       if (state.id) {

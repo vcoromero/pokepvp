@@ -13,6 +13,14 @@ function mapPokemonListItem(raw) {
   };
 }
 
+function toTypes(value) {
+  if (Array.isArray(value)) {
+    return value.filter((t) => typeof t === 'string').slice(0, 2);
+  }
+  if (typeof value === 'string' && value) return [value];
+  return [];
+}
+
 function mapPokemonDetail(raw) {
   return {
     id: toSafeNumber(raw?.id, NaN),
@@ -21,6 +29,8 @@ function mapPokemonDetail(raw) {
     attack: toSafeNumber(raw?.attack, 0),
     defense: toSafeNumber(raw?.defense, 0),
     speed: toSafeNumber(raw?.speed, 0),
+    sprite: typeof raw?.sprite === 'string' && raw.sprite ? raw.sprite : '',
+    type: toTypes(raw?.type ?? raw?.types),
   };
 }
 

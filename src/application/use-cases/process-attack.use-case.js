@@ -134,22 +134,35 @@ export class ProcessAttackUseCase {
       await this.battleRepository.save({ ...battle, nextToActPlayerId: defenderPlayerId });
     }
 
+    const nextState = nextActivePokemon.pokemonId != null
+      ? statesByKey[`${defenderPlayerId}:${nextActivePokemon.pokemonId}`]
+      : null;
+
     const payload = {
       battleId: battle.id,
       lobbyId,
       attacker: {
         playerId: attackerPlayerId,
         pokemonId: attackerActive.pokemonId,
+        name: attackerActive.state.name ?? '',
+        sprite: attackerActive.state.sprite ?? '',
       },
       defender: {
         playerId: defenderPlayerId,
         pokemonId: defenderActive.pokemonId,
+        name: defenderActive.state.name ?? '',
+        sprite: defenderActive.state.sprite ?? '',
         damage,
         previousHp,
         currentHp,
         defeated,
       },
-      nextActivePokemon,
+      nextActivePokemon: {
+        playerId: nextActivePokemon.playerId,
+        pokemonId: nextActivePokemon.pokemonId,
+        name: nextState?.name ?? '',
+        sprite: nextState?.sprite ?? '',
+      },
       battleFinished,
       nextToActPlayerId: battleFinished ? undefined : defenderPlayerId,
     };

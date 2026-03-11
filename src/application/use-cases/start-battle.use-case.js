@@ -95,9 +95,15 @@ export class StartBattleUseCase {
     });
 
     const states = [];
+    const detailsByTeam = (team) => {
+      const map = new Map((team.pokemonDetails ?? []).map((d) => [d.pokemonId, d]));
+      return map;
+    };
     for (const team of teams) {
       const playerId = team.playerId;
+      const teamDetails = detailsByTeam(team);
       for (const pokemonId of team.pokemonIds ?? []) {
+        const display = teamDetails.get(pokemonId);
         const detail = await this.catalogPort.getById(pokemonId);
         if (!detail || typeof detail.hp !== 'number') {
           throw new ValidationError(`Missing or invalid catalog data for Pokémon ${pokemonId}`);
@@ -108,6 +114,9 @@ export class StartBattleUseCase {
           playerId,
           currentHp: detail.hp,
           defeated: false,
+          name: display?.name ?? '',
+          sprite: display?.sprite ?? '',
+          type: Array.isArray(display?.type) ? display.type : [],
         });
       }
     }
