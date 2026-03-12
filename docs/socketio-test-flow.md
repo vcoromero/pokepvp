@@ -236,6 +236,58 @@ Other possible codes: `ValidationError`, `NotFoundError`.
 
 ---
 
+---
+
+### 6. surrender (extra feature)
+
+This event lets a player **give up** the current battle to avoid excessively long matches (for example, when damage is very low and HP is very high). It was added as an **extra implementation**, not part of the original project rules (similar to `rejoin_lobby`).
+
+- A player can only surrender when the lobby is in **`battling`** state.
+- The surrendering player **automatically loses**; the opponent is declared the winner.
+- Pokémon states are **not** modified (their HP/defeated flags stay as they were at the moment of surrender).
+
+| Field | Value |
+|-------|-------|
+| **Event** | `surrender` |
+| **Payload** | `{ "lobbyId": "<lobby_id>" }` *(optional; the server also infers the lobby from the socket context and will reject a mismatching lobbyId)* |
+
+**Ack (success):**
+
+```json
+{
+  "battleId": "<battle_id>",
+  "lobbyId": "<lobby_id>",
+  "winnerId": "<opponent_player_id>",
+  "loserId": "<surrendering_player_id>",
+  "reason": "surrender",
+  "lobby": {
+    "id": "<lobby_id>",
+    "status": "finished",
+    "playerIds": ["<p1>", "<p2>"],
+    "readyPlayerIds": ["<p1>", "<p2>"],
+    "createdAt": "<iso_date>"
+  }
+}
+```
+
+**Ack (error):** `{ "error": { "code": "ValidationError|ConflictError|NotFoundError", "message": "..." } }` — e.g. player not in lobby, lobby not found, or lobby is not in `battling` state.
+
+**Server emits:** `battle_end` with a payload that includes at least:
+
+```json
+{
+  "battleId": "<battle_id>",
+  "lobbyId": "<lobby_id>",
+  "winnerId": "<opponent_player_id>",
+  "loserId": "<surrendering_player_id>",
+  "reason": "surrender"
+}
+```
+
+This allows clients to distinguish between a normal victory (all opponent Pokémon defeated) and a victory by surrender, and immediately show appropriate UI or offer to start a new lobby.
+
+---
+
 ## Ack summary (Client → Server)
 
 | Event | Ack (success) | Ack (error) |
@@ -245,6 +297,7 @@ Other possible codes: `ValidationError`, `NotFoundError`.
 | `assign_pokemon` | `{ team, lobby }` — `team` has `pokemonIds` and `pokemonDetails` (name, sprite, type per Pokémon) | `{ error: { code, message } }` |
 | `ready` | `{ lobby }` — includes `readyPlayerIds`, `status` ("waiting" or "ready") | `{ error: { code, message } }` |
 | `attack` | Same as `turn_result` payload (attacker, defender, nextActivePokemon with name/sprite; damage, HP; nextToActPlayerId; battleFinished) | `{ error: { code, message } }` |
+| `surrender` | `{ battleId, lobbyId, winnerId, loserId, reason, lobby }` | `{ error: { code, message } }` |
 
 If the client does not pass an ack callback, the server still emits `error` on failure but there is no callback to receive the error payload.
 
@@ -258,7 +311,7 @@ If the client does not pass an ack callback, the server still emits `error` on f
 | `error` | On validation, conflict, or server error | `{ code, message }` |
 | `battle_start` | When both players are ready and the battle is initialized | `{ battle, pokemonStates }` — `battle` includes `nextToActPlayerId`; each state has `name`, `sprite`, `type` |
 | `turn_result` | After each valid `attack` | Same as the `attack` ack; includes attacker/defender/nextActivePokemon with name/sprite |
-| `battle_end` | When a player has no remaining Pokémon | `{ battleId, lobbyId, winnerId }` |
+| `battle_end` | When a player has no remaining Pokémon **or when a player surrenders (extra feature)** | `{ battleId, lobbyId, winnerId, loserId?, reason? }` |
 
 ---
 

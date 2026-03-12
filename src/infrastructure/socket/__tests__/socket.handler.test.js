@@ -35,6 +35,7 @@ describe('SocketHandler', () => {
   let markReadyUseCase;
   let startBattleUseCase;
   let processAttackUseCase;
+  let surrenderBattleUseCase;
   let realtimePort;
   let handler;
 
@@ -45,6 +46,7 @@ describe('SocketHandler', () => {
     markReadyUseCase = { execute: jest.fn() };
     startBattleUseCase = { execute: jest.fn() };
     processAttackUseCase = { execute: jest.fn() };
+    surrenderBattleUseCase = { execute: jest.fn() };
     realtimePort = {
       notifyLobbyStatus: jest.fn(),
       notifyBattleStart: jest.fn(),
@@ -58,6 +60,7 @@ describe('SocketHandler', () => {
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
+      surrenderBattleUseCase,
       realtimePort
     );
   });
@@ -76,6 +79,64 @@ describe('SocketHandler', () => {
       expect(socket.on).toHaveBeenCalledWith('assign_pokemon', expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith('ready', expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith('attack', expect.any(Function));
+      expect(socket.on).toHaveBeenCalledWith('surrender', expect.any(Function));
+    });
+  });
+
+  describe('handleSurrender', () => {
+    it('calls surrenderBattleUseCase with lobbyId and surrenderingPlayerId, acks with result', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const result = {
+        battleId: 'b1',
+        lobbyId: 'l1',
+        winnerId: 'p2',
+        loserId: 'p1',
+        reason: 'surrender',
+      };
+      surrenderBattleUseCase.execute.mockResolvedValue(result);
+
+      const ack = jest.fn();
+      socket._trigger('surrender', { lobbyId: 'l1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(surrenderBattleUseCase.execute).toHaveBeenCalledWith({
+        lobbyId: 'l1',
+        surrenderingPlayerId: 'p1',
+      });
+      expect(ack).toHaveBeenCalledWith(result);
+    });
+
+    it('emits ValidationError when payload lobbyId differs from socket context', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      socket.data.lobbyId = 'l1';
+      socket.data.playerId = 'p1';
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const ack = jest.fn();
+      socket._trigger('surrender', { lobbyId: 'l2' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(surrenderBattleUseCase.execute).not.toHaveBeenCalled();
+      expect(socket.emit).toHaveBeenCalledWith('error', {
+        code: 'ValidationError',
+        message: 'Socket is not in this lobby',
+      });
+      expect(ack).toHaveBeenCalledWith({
+        error: {
+          code: 'ValidationError',
+          message: 'Socket is not in this lobby',
+        },
+      });
     });
   });
 

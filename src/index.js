@@ -11,6 +11,7 @@ import { AssignTeamUseCase } from './application/use-cases/assign-team.use-case.
 import { MarkReadyUseCase } from './application/use-cases/mark-ready.use-case.js';
 import { StartBattleUseCase } from './application/use-cases/start-battle.use-case.js';
 import { ProcessAttackUseCase } from './application/use-cases/process-attack.use-case.js';
+import { SurrenderBattleUseCase } from './application/use-cases/surrender-battle.use-case.js';
 import { SocketIOAdapter } from './infrastructure/socket/socketio.adapter.js';
 import { SocketHandler } from './infrastructure/socket/socket.handler.js';
 import { PlayerMongoRepository } from './infrastructure/persistence/mongodb/adapters/player.mongo.repository.js';
@@ -78,6 +79,11 @@ async function start() {
       catalogPort,
       realtimePort
     );
+    const surrenderBattleUseCase = new SurrenderBattleUseCase(
+      repositories.lobbyRepository,
+      repositories.battleRepository,
+      realtimePort
+    );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
       rejoinLobbyUseCase,
@@ -85,6 +91,7 @@ async function start() {
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
+      surrenderBattleUseCase,
       realtimePort
     );
     socketHandler.attach(io);

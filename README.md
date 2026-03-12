@@ -74,17 +74,15 @@ The app uses a single `MONGODB_URI`; switch between local Docker and Atlas by ch
 - **[docs/business-rules.md](docs/business-rules.md)** — Canonical business rules: catalog, team selection, lobby states, battle flow, damage formula, events, and persistence. Used by both backend and frontend.
 - **[docs/architecture.md](docs/architecture.md)** — Backend architecture: hexagonal layout, event-driven communication, SOLID/Clean Code, and a layers diagram.
 - **[docs/phased-plan.md](docs/phased-plan.md)** — Phased implementation plan: Stage 1 (minimal Express + PokeAPI proxy) through Stage 6 (full battle and events).
-- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, rejoin_lobby, assign_pokemon, ready, attack) using Postman or similar.
+- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, rejoin_lobby, assign_pokemon, ready, attack, surrender) using Postman or similar.
 
 **Note:** The `rejoin_lobby` event is **not part of the MVP**; it was added as an extra to improve UX when a player reconnects (e.g. after switching tabs or losing the socket connection), so they can reattach to the same lobby and continue the battle without starting over.
 
-## ☁️ Deploy on Render
+Similarly, the `surrender` event was added as an extra implementation (also outside the original project rules) to avoid excessively long battles, allowing a player to surrender only while the lobby is in `battling` state and quickly finish the match so both players can start a new lobby.
 
-You can deploy this backend to [Render](https://render.com) as a **Web Service** (no Docker required). You need a MongoDB in the cloud (e.g. [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)); Render does not provide MongoDB.
+## ☁️ Deploy
 
-**Quick steps:** Connect your GitHub/GitLab repo → New → **Web Service** → choose the repo → Runtime **Node** → Build: `npm install`, Start: `npm start` → Add env vars: `MONGODB_URI` (Atlas URI), `POKEAPI_BASE_URL`, and optionally `CORS_ORIGIN` (your frontend URL). Then Create Web Service.
-
-Full step-by-step and troubleshooting: **[docs/render-deploy.md](docs/render-deploy.md)**.
+The backend is already deployed on **Render** and available at: `https://pokepvp.onrender.com`.
 
 ## 🚀 Future improvements
 

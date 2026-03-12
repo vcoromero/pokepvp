@@ -9,6 +9,7 @@ import { AssignTeamUseCase } from '../application/use-cases/assign-team.use-case
 import { MarkReadyUseCase } from '../application/use-cases/mark-ready.use-case.js';
 import { StartBattleUseCase } from '../application/use-cases/start-battle.use-case.js';
 import { ProcessAttackUseCase } from '../application/use-cases/process-attack.use-case.js';
+import { SurrenderBattleUseCase } from '../application/use-cases/surrender-battle.use-case.js';
 import { SocketIOAdapter } from '../infrastructure/socket/socketio.adapter.js';
 import { SocketHandler } from '../infrastructure/socket/socket.handler.js';
 
@@ -85,6 +86,11 @@ describe('Socket.IO integration', () => {
       mockCatalogPort,
       realtimePort
     );
+    const surrenderBattleUseCase = new SurrenderBattleUseCase(
+      mockLobbyRepository,
+      mockBattleRepository,
+      realtimePort
+    );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
       rejoinLobbyUseCase,
@@ -92,6 +98,7 @@ describe('Socket.IO integration', () => {
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
+      surrenderBattleUseCase,
       realtimePort
     );
     socketHandler.attach(io);
