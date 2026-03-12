@@ -32,7 +32,7 @@ The domain layer contains business logic with **no dependency** on Express, Mong
 
 ### 2.2 Application Layer (Use Cases)
 
-- **Use cases** orchestrate flows: join lobby, assign Pokémon team, mark ready, start battle, process attack.
+- **Use cases** orchestrate flows: join lobby, rejoin lobby (post-MVP, for reconnection UX), assign Pokémon team, mark ready, start battle, process attack.
 - Each use case receives only what it needs and **delegates business logic** to domain entities and services.
 - The application layer depends on **abstractions** (ports), not concrete adapters.
 
@@ -45,7 +45,7 @@ The domain layer contains business logic with **no dependency** on Express, Mong
 ### 2.4 Input Adapters (Infrastructure Layer)
 
 - **`infrastructure/http/`** — Express: only the `/health` endpoint remains. All game logic was moved to Socket.IO (the REST controllers for catalog and lobby were removed as dead/redundant code).
-- **`infrastructure/socket/`** — Socket.IO handler: handles real-time events (`join_lobby`, `assign_pokemon`, `ready`, `attack`) and delegates to use cases. Uses `wrapHandler()` for uniform error handling and `requirePlayerContext()` for authentication.
+- **`infrastructure/socket/`** — Socket.IO handler: handles real-time events (`join_lobby`, `rejoin_lobby`, `assign_pokemon`, `ready`, `attack`) and delegates to use cases. Uses `wrapHandler()` for uniform error handling and `requirePlayerContext()` for authentication.
 
 ### 2.5 Output Adapters (Infrastructure Layer)
 
@@ -60,7 +60,7 @@ The domain layer contains business logic with **no dependency** on Express, Mong
 - All game events flow through **Socket.IO**. The server emits `lobby_status`, `battle_start`, `turn_result`, and `battle_end` to the relevant room (one room per lobby).
 - The `RealtimePort` interface decouples the application layer from Socket.IO specifics. Use cases call port methods like `notifyBattleStart(lobbyId, payload)` without knowing about rooms or sockets.
 - **Turn processing** is atomic (one attack at a time) to avoid race conditions.
-- **Player identity** is established once via `join_lobby` and stored in `socket.data`. All subsequent events authenticate using this server-side context — payloads cannot override it.
+- **Player identity** is established via `join_lobby` (or restored via `rejoin_lobby` after a reconnect) and stored in `socket.data`. All subsequent events authenticate using this server-side context — payloads cannot override it.
 
 ---
 
@@ -68,7 +68,7 @@ The domain layer contains business logic with **no dependency** on Express, Mong
 
 ### SOLID
 
-- **SRP:** Each use case and each adapter has a single, well-defined responsibility. The `SocketHandler` has 6 dependencies — each use case it delegates to, plus the realtime port.
+- **SRP:** Each use case and each adapter has a single, well-defined responsibility. The `SocketHandler` delegates to use cases (join lobby, rejoin lobby, assign team, mark ready, start battle, process attack) plus the realtime port.
 - **OCP:** New behavior is added by new use cases or new adapters without changing existing core logic.
 - **LSP:** Any implementation of a port can replace another (e.g. in-memory vs MongoDB repositories) without breaking callers.
 - **ISP:** Ports are small and specific (e.g. "save battle", "notify lobby") rather than one large interface.

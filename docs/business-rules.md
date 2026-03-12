@@ -80,6 +80,7 @@ The lobby shall have exactly the following states:
 | Event            | Purpose |
 |------------------|--------|
 | `join_lobby`     | Allows a player to enter the lobby (e.g. with nickname). |
+| `rejoin_lobby`   | Reattaches this connection to an existing player in a lobby (e.g. after socket reconnect or returning to the tab). Not part of the MVP; added to improve UX when the connection loses player context. Payload: `{ playerId, lobbyId }`. |
 | `assign_pokemon` | Requests assignment of the random Pokémon team for the player. |
 | `ready`          | Indicates the player confirms their team and is ready to battle. If both are ready, lobby status becomes `battling` and server emits `battle_start`. |
 | `attack`         | Indicates the player’s active Pokémon attacks the rival; server updates HP and emits `turn_result`. |

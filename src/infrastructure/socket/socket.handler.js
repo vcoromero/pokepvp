@@ -40,6 +40,7 @@ function wrapHandler(fn, eventName) {
 export class SocketHandler {
   constructor(
     joinLobbyUseCase,
+    rejoinLobbyUseCase,
     assignTeamUseCase,
     markReadyUseCase,
     startBattleUseCase,
@@ -47,6 +48,7 @@ export class SocketHandler {
     realtimePort
   ) {
     this.joinLobbyUseCase = joinLobbyUseCase;
+    this.rejoinLobbyUseCase = rejoinLobbyUseCase;
     this.assignTeamUseCase = assignTeamUseCase;
     this.markReadyUseCase = markReadyUseCase;
     this.startBattleUseCase = startBattleUseCase;
@@ -58,6 +60,8 @@ export class SocketHandler {
     io.on('connection', (socket) => {
       socket.on('join_lobby', (payload, ack) =>
         wrapHandler((s, p) => this.handleJoinLobby(s, p), 'join_lobby')(socket, payload, ack));
+      socket.on('rejoin_lobby', (payload, ack) =>
+        wrapHandler((s, p) => this.handleRejoinLobby(s, p), 'rejoin_lobby')(socket, payload, ack));
       socket.on('assign_pokemon', (payload, ack) =>
         wrapHandler((s, p) => this.handleAssignPokemon(s, p), 'assign_pokemon')(socket, payload, ack));
       socket.on('ready', (payload, ack) =>
@@ -87,6 +91,21 @@ export class SocketHandler {
     socket.data.playerId = player.id;
 
     this.realtimePort.notifyLobbyStatus(lobby.id, { lobby, player });
+    return { player, lobby };
+  }
+
+  async handleRejoinLobby(socket, payload) {
+    const result = await this.rejoinLobbyUseCase.execute({
+      playerId: payload?.playerId,
+      lobbyId: payload?.lobbyId,
+    });
+    const { player, lobby } = result;
+
+    socket.join(ROOM_PREFIX + lobby.id);
+    socket.data.lobbyId = lobby.id;
+    socket.data.playerId = player.id;
+
+    this.realtimePort.notifyLobbyStatus(lobby.id, { lobby });
     return { player, lobby };
   }
 
