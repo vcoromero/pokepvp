@@ -45,6 +45,7 @@ export class SocketHandler {
     markReadyUseCase,
     startBattleUseCase,
     processAttackUseCase,
+    surrenderBattleUseCase,
     realtimePort
   ) {
     this.joinLobbyUseCase = joinLobbyUseCase;
@@ -53,6 +54,7 @@ export class SocketHandler {
     this.markReadyUseCase = markReadyUseCase;
     this.startBattleUseCase = startBattleUseCase;
     this.processAttackUseCase = processAttackUseCase;
+    this.surrenderBattleUseCase = surrenderBattleUseCase;
     this.realtimePort = realtimePort;
   }
 
@@ -68,6 +70,8 @@ export class SocketHandler {
         wrapHandler((s, p) => this.handleReady(s, p), 'ready')(socket, payload, ack));
       socket.on('attack', (payload, ack) =>
         wrapHandler((s, p) => this.handleAttack(s, p), 'attack')(socket, payload, ack));
+      socket.on('surrender', (payload, ack) =>
+        wrapHandler((s, p) => this.handleSurrender(s, p), 'surrender')(socket, payload, ack));
     });
   }
 
@@ -175,5 +179,19 @@ export class SocketHandler {
       battleFinished: turnResult.battleFinished,
       ...(turnResult.nextToActPlayerId != null && { nextToActPlayerId: turnResult.nextToActPlayerId }),
     }));
+  }
+
+  async handleSurrender(socket, payload) {
+    const { lobbyId, playerId } = this.requirePlayerContext(socket);
+    if (payload?.lobbyId && payload.lobbyId !== lobbyId) {
+      throw new ValidationError('Socket is not in this lobby');
+    }
+
+    const result = await this.surrenderBattleUseCase.execute({
+      lobbyId,
+      surrenderingPlayerId: playerId,
+    });
+
+    return JSON.parse(JSON.stringify(result));
   }
 }
