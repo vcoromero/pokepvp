@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { connect } from './infrastructure/persistence/mongodb/connection.js';
 import { PokeAPIAdapter } from './infrastructure/clients/pokeapi.adapter.js';
 import { JoinLobbyUseCase } from './application/use-cases/join-lobby.use-case.js';
+import { RejoinLobbyUseCase } from './application/use-cases/rejoin-lobby.use-case.js';
 import { AssignTeamUseCase } from './application/use-cases/assign-team.use-case.js';
 import { MarkReadyUseCase } from './application/use-cases/mark-ready.use-case.js';
 import { StartBattleUseCase } from './application/use-cases/start-battle.use-case.js';
@@ -47,6 +48,10 @@ async function start() {
       repositories.playerRepository,
       repositories.lobbyRepository
     );
+    const rejoinLobbyUseCase = new RejoinLobbyUseCase(
+      repositories.playerRepository,
+      repositories.lobbyRepository
+    );
     const assignTeamUseCase = new AssignTeamUseCase(
       catalogPort,
       repositories.lobbyRepository,
@@ -75,6 +80,7 @@ async function start() {
     );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
+      rejoinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
       startBattleUseCase,

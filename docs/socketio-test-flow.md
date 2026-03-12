@@ -47,7 +47,34 @@ Creates or joins an active lobby. First player creates a new lobby; second playe
 
 ---
 
-### 2. assign_pokemon
+### 2. rejoin_lobby (optional — after reconnect)
+
+If the client **reconnects** (e.g. new tab, or socket dropped after switching apps), the new socket has no player context. Use `rejoin_lobby` to reattach this connection to the same player and lobby so you can continue with `assign_pokemon`, `ready`, or `attack` without starting over.
+
+| Field | Value |
+|-------|-------|
+| **Event** | `rejoin_lobby` |
+| **Payload** | `{ "playerId": "<player_id>", "lobbyId": "<lobby_id>" }` |
+
+You must have obtained `playerId` and `lobbyId` from a previous successful `join_lobby` ack (or from your stored session). The player must belong to the lobby and the lobby must still be in `waiting`, `ready`, or `battling` (not `finished`).
+
+**Ack (success):**
+```json
+{
+  "player": { "id": "<player_id>", "nickname": "...", "lobbyId": "<lobby_id>" },
+  "lobby": { "id": "<lobby_id>", "status": "waiting | ready | battling", "playerIds": [...], "readyPlayerIds": [], "createdAt": "..." }
+}
+```
+
+**Ack (error):** `{ "error": { "code": "ValidationError|NotFoundError|ConflictError", "message": "..." } }` — e.g. missing playerId/lobbyId, player/lobby not found, player not in lobby, or lobby already finished.
+
+**Server emits:** `lobby_status` with `{ lobby }`. The socket is joined to the lobby room and `socket.data.playerId` / `socket.data.lobbyId` are set, so subsequent `assign_pokemon`, `ready`, and `attack` work as usual.
+
+**Test flow:** In Postman, complete `join_lobby` for one player and note the ack’s `player.id` and `lobby.id`. Disconnect the socket (or use a new tab), connect again, then emit `rejoin_lobby` with those ids. After a successful ack, you can send `attack` (if the battle was already in progress) or continue the flow from assign/ready.
+
+---
+
+### 3. assign_pokemon
 
 Assigns a random team of 3 Pokémon to a player. Must be called once per player.
 
@@ -82,7 +109,7 @@ The server identifies the player and lobby from the socket connection (set durin
 
 ---
 
-### 3. ready
+### 4. ready
 
 Marks a player as ready. Both players must call this. When both are ready:
 
@@ -143,7 +170,7 @@ When both players have sent `ready`, the second ack has `status: "ready"`. The s
 
 ---
 
-### 4. attack
+### 5. attack
 
 Triggers a single attack from the current active Pokémon of the player whose turn it is.
 
@@ -154,7 +181,7 @@ Triggers a single attack from the current active Pokémon of the player whose tu
 
 Notes:
 
-- **Same connection:** The server infers the attacker from the socket (`socket.data.playerId`). You must send `join_lobby`, then `assign_pokemon`, then `ready` **on the same Socket.IO connection** before sending `attack`. In Postman, use the same tab/window where you joined as that player; if you use a new tab or reconnect without joining, `attack` will fail with "This connection has no player context".
+- **Same connection or rejoin:** The server infers the attacker from the socket (`socket.data.playerId`). You must either send `join_lobby`, then `assign_pokemon`, then `ready` **on the same Socket.IO connection** before sending `attack`, or (after a reconnect) send `rejoin_lobby` with `{ playerId, lobbyId }` to restore context, then you can send `attack`. If you use a new tab or reconnect without joining or rejoining, `attack` will fail with "This connection has no player context".
 - Turn order: the **first turn** is decided by the initial active Pokémon's Speed (tiebreaker: playerId). **After that, turns alternate** — only the player who did not attack last may send the next `attack`.
 - If it is **not** this player's turn, the server returns a `ConflictError` ("Not this player's turn").
 - If the battle has not started or already finished, the server returns an error.
@@ -214,6 +241,7 @@ Other possible codes: `ValidationError`, `NotFoundError`.
 | Event | Ack (success) | Ack (error) |
 |-------|----------------|-------------|
 | `join_lobby` | `{ player, lobby }` | `{ error: { code, message } }` |
+| `rejoin_lobby` | `{ player, lobby }` | `{ error: { code, message } }` |
 | `assign_pokemon` | `{ team, lobby }` — `team` has `pokemonIds` and `pokemonDetails` (name, sprite, type per Pokémon) | `{ error: { code, message } }` |
 | `ready` | `{ lobby }` — includes `readyPlayerIds`, `status` ("waiting" or "ready") | `{ error: { code, message } }` |
 | `attack` | Same as `turn_result` payload (attacker, defender, nextActivePokemon with name/sprite; damage, HP; nextToActPlayerId; battleFinished) | `{ error: { code, message } }` |
@@ -226,7 +254,7 @@ If the client does not pass an ack callback, the server still emits `error` on f
 
 | Event | When | Payload |
 |-------|------|---------|
-| `lobby_status` | After `join_lobby`, `assign_pokemon`, or `ready` | `{ lobby, player? }` |
+| `lobby_status` | After `join_lobby`, `rejoin_lobby`, `assign_pokemon`, or `ready` | `{ lobby, player? }` |
 | `error` | On validation, conflict, or server error | `{ code, message }` |
 | `battle_start` | When both players are ready and the battle is initialized | `{ battle, pokemonStates }` — `battle` includes `nextToActPlayerId`; each state has `name`, `sprite`, `type` |
 | `turn_result` | After each valid `attack` | Same as the `attack` ack; includes attacker/defender/nextActivePokemon with name/sprite |

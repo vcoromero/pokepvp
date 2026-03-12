@@ -74,7 +74,9 @@ The app uses a single `MONGODB_URI`; switch between local Docker and Atlas by ch
 - **[docs/business-rules.md](docs/business-rules.md)** — Canonical business rules: catalog, team selection, lobby states, battle flow, damage formula, events, and persistence. Used by both backend and frontend.
 - **[docs/architecture.md](docs/architecture.md)** — Backend architecture: hexagonal layout, event-driven communication, SOLID/Clean Code, and a layers diagram.
 - **[docs/phased-plan.md](docs/phased-plan.md)** — Phased implementation plan: Stage 1 (minimal Express + PokeAPI proxy) through Stage 6 (full battle and events).
-- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, assign_pokemon, ready, attack) using Postman or similar.
+- **[docs/socketio-test-flow.md](docs/socketio-test-flow.md)** — Manual test flow for Socket.IO (join_lobby, rejoin_lobby, assign_pokemon, ready, attack) using Postman or similar.
+
+**Note:** The `rejoin_lobby` event is **not part of the MVP**; it was added as an extra to improve UX when a player reconnects (e.g. after switching tabs or losing the socket connection), so they can reattach to the same lobby and continue the battle without starting over.
 
 ## ☁️ Deploy on Render
 

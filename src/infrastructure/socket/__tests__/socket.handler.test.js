@@ -30,6 +30,7 @@ function createMockIo() {
 
 describe('SocketHandler', () => {
   let joinLobbyUseCase;
+  let rejoinLobbyUseCase;
   let assignTeamUseCase;
   let markReadyUseCase;
   let startBattleUseCase;
@@ -39,6 +40,7 @@ describe('SocketHandler', () => {
 
   beforeEach(() => {
     joinLobbyUseCase = { execute: jest.fn() };
+    rejoinLobbyUseCase = { execute: jest.fn() };
     assignTeamUseCase = { execute: jest.fn() };
     markReadyUseCase = { execute: jest.fn() };
     startBattleUseCase = { execute: jest.fn() };
@@ -51,6 +53,7 @@ describe('SocketHandler', () => {
     };
     handler = new SocketHandler(
       joinLobbyUseCase,
+      rejoinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
       startBattleUseCase,
@@ -69,6 +72,7 @@ describe('SocketHandler', () => {
       const socket = createMockSocket();
       mockIo._simulateConnection(socket);
       expect(socket.on).toHaveBeenCalledWith('join_lobby', expect.any(Function));
+      expect(socket.on).toHaveBeenCalledWith('rejoin_lobby', expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith('assign_pokemon', expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith('ready', expect.any(Function));
       expect(socket.on).toHaveBeenCalledWith('attack', expect.any(Function));
@@ -136,6 +140,50 @@ describe('SocketHandler', () => {
 
       expect(socket.join).toHaveBeenCalled();
       expect(realtimePort.notifyLobbyStatus).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleRejoinLobby', () => {
+    it('calls use case, joins socket to room, sets socket data, notifies lobby status, acks with result', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      const result = {
+        player: { id: 'p1', nickname: 'Ash', lobbyId: 'l1' },
+        lobby: { id: 'l1', status: 'battling', playerIds: ['p1', 'p2'], readyPlayerIds: ['p1', 'p2'] },
+      };
+      rejoinLobbyUseCase.execute.mockResolvedValue(result);
+
+      const ack = jest.fn();
+      socket._trigger('rejoin_lobby', { playerId: 'p1', lobbyId: 'l1' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(rejoinLobbyUseCase.execute).toHaveBeenCalledWith({ playerId: 'p1', lobbyId: 'l1' });
+      expect(socket.join).toHaveBeenCalledWith('lobby:l1');
+      expect(socket.data.lobbyId).toBe('l1');
+      expect(socket.data.playerId).toBe('p1');
+      expect(realtimePort.notifyLobbyStatus).toHaveBeenCalledWith('l1', { lobby: result.lobby });
+      expect(ack).toHaveBeenCalledWith({ player: result.player, lobby: result.lobby });
+    });
+
+    it('emits error and acks with error when use case throws', async () => {
+      const mockIo = createMockIo();
+      const socket = createMockSocket();
+      handler.attach(mockIo);
+      mockIo._simulateConnection(socket);
+
+      rejoinLobbyUseCase.execute.mockRejectedValue(new NotFoundError('Lobby not found'));
+
+      const ack = jest.fn();
+      socket._trigger('rejoin_lobby', { playerId: 'p1', lobbyId: 'l99' }, ack);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(socket.emit).toHaveBeenCalledWith('error', { code: 'NotFoundError', message: 'Lobby not found' });
+      expect(ack).toHaveBeenCalledWith({ error: { code: 'NotFoundError', message: 'Lobby not found' } });
     });
   });
 

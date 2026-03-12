@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { io as ioClient } from 'socket.io-client';
 import { createApp } from '../app.js';
 import { JoinLobbyUseCase } from '../application/use-cases/join-lobby.use-case.js';
+import { RejoinLobbyUseCase } from '../application/use-cases/rejoin-lobby.use-case.js';
 import { AssignTeamUseCase } from '../application/use-cases/assign-team.use-case.js';
 import { MarkReadyUseCase } from '../application/use-cases/mark-ready.use-case.js';
 import { StartBattleUseCase } from '../application/use-cases/start-battle.use-case.js';
@@ -34,6 +35,7 @@ describe('Socket.IO integration', () => {
     };
     mockPlayerRepository = {
       save: jest.fn(),
+      findById: jest.fn(),
     };
     mockTeamRepository = {
       save: jest.fn(),
@@ -59,6 +61,7 @@ describe('Socket.IO integration', () => {
     });
 
     const joinLobbyUseCase = new JoinLobbyUseCase(mockPlayerRepository, mockLobbyRepository);
+    const rejoinLobbyUseCase = new RejoinLobbyUseCase(mockPlayerRepository, mockLobbyRepository);
     const assignTeamUseCase = new AssignTeamUseCase(
       mockCatalogPort,
       mockLobbyRepository,
@@ -84,12 +87,12 @@ describe('Socket.IO integration', () => {
     );
     const socketHandler = new SocketHandler(
       joinLobbyUseCase,
+      rejoinLobbyUseCase,
       assignTeamUseCase,
       markReadyUseCase,
       startBattleUseCase,
       processAttackUseCase,
-      realtimePort,
-      mockLobbyRepository
+      realtimePort
     );
     socketHandler.attach(io);
   });
