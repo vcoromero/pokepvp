@@ -109,6 +109,6 @@ describe('RejoinLobbyUseCase', () => {
     await expect(useCase.execute({ playerId: 'p1', lobbyId: 'l1' }))
       .rejects.toThrow(ConflictError);
     await expect(useCase.execute({ playerId: 'p1', lobbyId: 'l1' }))
-      .rejects.toThrow('Cannot rejoin: lobby is finished or invalid');
+      .rejects.toThrow('Cannot rejoin: lobby is finished');
   });
 });
