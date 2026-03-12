@@ -66,7 +66,7 @@ You must have obtained `playerId` and `lobbyId` from a previous successful `join
 }
 ```
 
-**Ack (error):** `{ "error": { "code": "ValidationError|NotFoundError|ConflictError", "message": "..." } }` — e.g. missing playerId/lobbyId, player/lobby not found, player not in lobby, or lobby already finished.
+**Ack (error):** `{ "error": { "code": "ValidationError|NotFoundError|ConflictError", "message": "..." } }` — e.g. missing playerId/lobbyId, player/lobby not found, player not in lobby, or lobby already finished (in that case the message is **`\"Cannot rejoin: lobby is finished\"`**, so the client can treat it as “show final result and go back to start” instead of an unexpected failure).
 
 **Server emits:** `lobby_status` with `{ lobby }`. The socket is joined to the lobby room and `socket.data.playerId` / `socket.data.lobbyId` are set, so subsequent `assign_pokemon`, `ready`, and `attack` work as usual.
 

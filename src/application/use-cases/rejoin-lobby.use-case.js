@@ -34,7 +34,10 @@ export class RejoinLobbyUseCase {
       throw new NotFoundError('Player is not in this lobby');
     }
     if (!REJOINABLE_STATUSES.includes(lobby.status)) {
-      throw new ConflictError('Cannot rejoin: lobby is finished or invalid');
+      if (lobby.status === 'finished') {
+        throw new ConflictError('Cannot rejoin: lobby is finished');
+      }
+      throw new ConflictError('Cannot rejoin: lobby status is invalid for rejoin');
     }
 
     return { player, lobby: lobbyPlain };
